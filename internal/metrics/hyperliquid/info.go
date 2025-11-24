@@ -73,12 +73,12 @@ func NewClient(httpClient *http.Client) *Client {
 // This structure contains comprehensive data including perpetual positions,
 // spot balances, open orders, and historical data.
 type UserInfo struct {
-	Address   string              `json:"address"`
-	Perp      *PerpState          `json:"perp"`              // Perpetual futures state
-	Spot      *SpotState          `json:"spot"`              // Spot trading state
-	OpenOrders *OpenOrdersInfo    `json:"open_orders"`       // Current open orders
-	Funding   []FundingPayment     `json:"funding_payments"`  // Historical funding payments
-	UpdatedAt time.Time           `json:"updated_at"`
+	Address    string           `json:"address"`
+	Perp       *PerpState       `json:"perp"`             // Perpetual futures state
+	Spot       *SpotState       `json:"spot"`             // Spot trading state
+	OpenOrders *OpenOrdersInfo  `json:"open_orders"`      // Current open orders
+	Funding    []FundingPayment `json:"funding_payments"` // Historical funding payments
+	UpdatedAt  time.Time        `json:"updated_at"`
 }
 
 // PerpState represents the user's perpetual futures trading state.
@@ -93,31 +93,31 @@ type PerpState struct {
 
 // MarginSummary contains margin and account value information.
 type MarginSummary struct {
-	AccountValue     string `json:"accountValue"`
-	TotalNtlPos      string `json:"totalNtlPos"`
-	TotalRawUsd      string `json:"totalRawUsd"`
-	TotalMarginUsed  string `json:"totalMarginUsed"`
+	AccountValue    string `json:"accountValue"`
+	TotalNtlPos     string `json:"totalNtlPos"`
+	TotalRawUsd     string `json:"totalRawUsd"`
+	TotalMarginUsed string `json:"totalMarginUsed"`
 }
 
 // AssetPosition represents a perpetual position for a specific asset.
 type AssetPosition struct {
-	Position   Position   `json:"position"`
-	Type       string     `json:"type"`
+	Position Position `json:"position"`
+	Type     string   `json:"type"`
 }
 
 // Position contains detailed information about a trading position.
 type Position struct {
-	Coin            string          `json:"coin"`
-	EntryPx         string          `json:"entryPx,omitempty"`
-	Leverage        LeverageInfo    `json:"leverage"`
-	LiquidationPx   string          `json:"liquidationPx,omitempty"`
-	MarginUsed      string          `json:"marginUsed"`
-	MaxTradeSzs     []string        `json:"maxTradeSzs,omitempty"`
-	PositionValue   string          `json:"positionValue"`
-	ReturnOnEquity  string          `json:"returnOnEquity,omitempty"`
-	Szi             string          `json:"szi"`
-	UnrealizedPnl   string          `json:"unrealizedPnl"`
-	CumFunding      *CumFunding     `json:"cumFunding,omitempty"`
+	Coin           string       `json:"coin"`
+	EntryPx        string       `json:"entryPx,omitempty"`
+	Leverage       LeverageInfo `json:"leverage"`
+	LiquidationPx  string       `json:"liquidationPx,omitempty"`
+	MarginUsed     string       `json:"marginUsed"`
+	MaxTradeSzs    []string     `json:"maxTradeSzs,omitempty"`
+	PositionValue  string       `json:"positionValue"`
+	ReturnOnEquity string       `json:"returnOnEquity,omitempty"`
+	Szi            string       `json:"szi"`
+	UnrealizedPnl  string       `json:"unrealizedPnl"`
+	CumFunding     *CumFunding  `json:"cumFunding,omitempty"`
 }
 
 // LeverageInfo represents leverage settings for a position.
@@ -155,17 +155,17 @@ type OpenOrdersInfo struct {
 
 // Order represents an open order.
 type Order struct {
-	Coin        string `json:"coin"`
-	Side        string `json:"side"`
-	LimitPx     string `json:"limitPx"`
-	Sz          string `json:"sz"`
-	Oid         int64  `json:"oid"`
-	Timestamp   int64  `json:"timestamp"`
-	OrigSz      string `json:"origSz"`
-	Cloid       string `json:"cloid,omitempty"`
-	OrderType   string `json:"orderType,omitempty"`
-	ReduceOnly  bool   `json:"reduceOnly,omitempty"`
-	Tif         string `json:"tif,omitempty"`
+	Coin       string `json:"coin"`
+	Side       string `json:"side"`
+	LimitPx    string `json:"limitPx"`
+	Sz         string `json:"sz"`
+	Oid        int64  `json:"oid"`
+	Timestamp  int64  `json:"timestamp"`
+	OrigSz     string `json:"origSz"`
+	Cloid      string `json:"cloid,omitempty"`
+	OrderType  string `json:"orderType,omitempty"`
+	ReduceOnly bool   `json:"reduceOnly,omitempty"`
+	Tif        string `json:"tif,omitempty"`
 }
 
 // FundingPayment represents a funding payment record.

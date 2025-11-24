@@ -91,7 +91,7 @@ func TestFetchPerpState(t *testing.T) {
 	// Fields are present but may be empty strings or "0.0"
 	assert.NotNil(t, state.MarginSummary)
 	assert.NotNil(t, state.CrossMarginSummary)
-	
+
 	// Withdrawable should be present (may be "0.0" for accounts with only open orders)
 	assert.NotNil(t, state.Withdrawable)
 

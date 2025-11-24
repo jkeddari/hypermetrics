@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
+	"github.com/jkeddari/hypermetrics/internal/metrics/hyperliquid"
 	"github.com/jkeddari/hypermetrics/internal/metrics/leaderboard"
 )
 
@@ -39,10 +41,11 @@ func DefaultConfig() *Config {
 
 // Server represents the HTTP server with its dependencies.
 type Server struct {
-	config          *Config
-	leaderboardLive *leaderboard.LiveLeaderboard
-	httpServer      *http.Server
-	logger          *slog.Logger
+	config            *Config
+	leaderboardLive   *leaderboard.LiveLeaderboard
+	hyperliquidClient *hyperliquid.Client
+	httpServer        *http.Server
+	logger            *slog.Logger
 }
 
 // NewServer creates a new Server instance with the given configuration.
@@ -62,10 +65,14 @@ func NewServer(config *Config) (*Server, error) {
 		return nil, fmt.Errorf("server: failed to initialize leaderboard: %w", err)
 	}
 
+	// Initialize Hyperliquid client
+	hlClient := hyperliquid.NewClient(nil)
+
 	s := &Server{
-		config:          config,
-		leaderboardLive: lb,
-		logger:          config.Logger,
+		config:            config,
+		leaderboardLive:   lb,
+		hyperliquidClient: hlClient,
+		logger:            config.Logger,
 	}
 
 	// Setup HTTP server
@@ -86,6 +93,7 @@ func NewServer(config *Config) (*Server, error) {
 // setupRoutes configures all HTTP routes for the server.
 func (s *Server) setupRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/info/leaderboard", s.handleLeaderboard)
+	mux.HandleFunc("/api/info/user/", s.handleUserInfo)
 	mux.HandleFunc("/health", s.handleHealth)
 }
 
@@ -198,6 +206,152 @@ func (s *Server) buildSortCode(window, metric string) string {
 	return window + metric
 }
 
+// handleUserInfo handles GET /api/info/user/{address}
+//
+// Returns comprehensive user information from Hyperliquid including:
+//   - Perpetual positions and margin summary
+//   - Spot balances
+//   - Open orders (perp and spot)
+//   - Historical funding payments
+//
+// Example: GET /api/info/user/0x5d2f4460ac3514ada79f5d9838916e508ab39bb7
+func (s *Server) handleUserInfo(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		s.respondError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	// Extract address from URL path: /api/info/user/{address}
+	path := strings.TrimPrefix(r.URL.Path, "/api/info/user/")
+	address := strings.TrimSpace(path)
+
+	if address == "" {
+		s.respondError(w, http.StatusBadRequest, "address is required")
+		return
+	}
+
+	// Basic validation: Ethereum address should start with 0x and be 42 chars
+	if !strings.HasPrefix(address, "0x") || len(address) != 42 {
+		s.respondError(w, http.StatusBadRequest, "invalid Ethereum address format (must be 0x followed by 40 hex characters)")
+		return
+	}
+
+	// Fetch user info from Hyperliquid API
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+
+	s.logger.Info("fetching user info", "address", address)
+
+	userInfo, err := s.hyperliquidClient.InfoUser(ctx, address)
+	if err != nil {
+		s.logger.Error("failed to fetch user info", "address", address, "error", err)
+		s.respondError(w, http.StatusInternalServerError, "failed to fetch user information from Hyperliquid")
+		return
+	}
+
+	// Build API response
+	response := s.buildUserInfoResponse(userInfo)
+
+	s.respondJSON(w, http.StatusOK, response)
+}
+
+// buildUserInfoResponse converts internal UserInfo to API response format
+func (s *Server) buildUserInfoResponse(info *hyperliquid.UserInfo) UserInfoResponse {
+	response := UserInfoResponse{
+		Address:   info.Address,
+		UpdatedAt: info.UpdatedAt.Format(time.RFC3339),
+	}
+
+	// Build Perp response
+	if info.Perp != nil {
+		perpResp := PerpResponse{
+			AccountValue:    info.Perp.MarginSummary.AccountValue,
+			Withdrawable:    info.Perp.Withdrawable,
+			TotalMarginUsed: info.Perp.MarginSummary.TotalMarginUsed,
+			Positions:       make([]PositionResponse, 0, len(info.Perp.AssetPositions)),
+		}
+
+		for _, ap := range info.Perp.AssetPositions {
+			pos := ap.Position
+			perpResp.Positions = append(perpResp.Positions, PositionResponse{
+				Coin:          pos.Coin,
+				Size:          pos.Szi,
+				EntryPrice:    pos.EntryPx,
+				LiquidationPx: pos.LiquidationPx,
+				UnrealizedPnl: pos.UnrealizedPnl,
+				Leverage:      pos.Leverage.Value,
+				LeverageType:  pos.Leverage.Type,
+				PositionValue: pos.PositionValue,
+				MarginUsed:    pos.MarginUsed,
+			})
+		}
+
+		response.Perp = &perpResp
+	}
+
+	// Build Spot response
+	if info.Spot != nil {
+		spotResp := SpotResponse{
+			Balances: make([]BalanceResponse, 0, len(info.Spot.Balances)),
+		}
+
+		for _, bal := range info.Spot.Balances {
+			spotResp.Balances = append(spotResp.Balances, BalanceResponse{
+				Coin:  bal.Coin,
+				Total: bal.Total,
+				Hold:  bal.Hold,
+			})
+		}
+
+		response.Spot = &spotResp
+	}
+
+	// Build Open Orders response
+	if info.OpenOrders != nil {
+		ordersResp := OpenOrdersResponse{
+			Perp: make([]OrderResponse, 0, len(info.OpenOrders.Perp)),
+			Spot: make([]OrderResponse, 0, len(info.OpenOrders.Spot)),
+		}
+
+		for _, order := range info.OpenOrders.Perp {
+			ordersResp.Perp = append(ordersResp.Perp, OrderResponse{
+				Coin:      order.Coin,
+				Side:      order.Side,
+				LimitPx:   order.LimitPx,
+				Size:      order.Sz,
+				OrderID:   order.Oid,
+				Timestamp: order.Timestamp,
+			})
+		}
+
+		for _, order := range info.OpenOrders.Spot {
+			ordersResp.Spot = append(ordersResp.Spot, OrderResponse{
+				Coin:      order.Coin,
+				Side:      order.Side,
+				LimitPx:   order.LimitPx,
+				Size:      order.Sz,
+				OrderID:   order.Oid,
+				Timestamp: order.Timestamp,
+			})
+		}
+
+		response.OpenOrders = &ordersResp
+	}
+
+	// Build Funding response
+	response.Funding = make([]FundingPaymentResponse, 0, len(info.Funding))
+	for _, funding := range info.Funding {
+		response.Funding = append(response.Funding, FundingPaymentResponse{
+			Time:        funding.Time,
+			Coin:        funding.Coin,
+			AmountUSDC:  funding.UsedC,
+			FundingRate: funding.FundingRate,
+		})
+	}
+
+	return response
+}
+
 // handleHealth handles GET /health for health checks.
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
@@ -293,4 +447,71 @@ type HealthResponse struct {
 type ErrorResponse struct {
 	Error  string `json:"error"`
 	Status int    `json:"status"`
+}
+
+// UserInfoResponse represents the response for /api/info/user/{address}
+type UserInfoResponse struct {
+	Address    string                   `json:"address"`
+	Perp       *PerpResponse            `json:"perp"`
+	Spot       *SpotResponse            `json:"spot"`
+	OpenOrders *OpenOrdersResponse      `json:"open_orders"`
+	Funding    []FundingPaymentResponse `json:"funding_payments"`
+	UpdatedAt  string                   `json:"updated_at"`
+}
+
+// PerpResponse represents perpetual futures state in the API response
+type PerpResponse struct {
+	AccountValue    string             `json:"account_value"`
+	Withdrawable    string             `json:"withdrawable"`
+	TotalMarginUsed string             `json:"total_margin_used"`
+	Positions       []PositionResponse `json:"positions"`
+}
+
+// PositionResponse represents a position in the API response
+type PositionResponse struct {
+	Coin          string `json:"coin"`
+	Size          string `json:"size"`
+	EntryPrice    string `json:"entry_price"`
+	LiquidationPx string `json:"liquidation_px,omitempty"`
+	UnrealizedPnl string `json:"unrealized_pnl"`
+	Leverage      int    `json:"leverage"`
+	LeverageType  string `json:"leverage_type"`
+	PositionValue string `json:"position_value"`
+	MarginUsed    string `json:"margin_used"`
+}
+
+// SpotResponse represents spot state in the API response
+type SpotResponse struct {
+	Balances []BalanceResponse `json:"balances"`
+}
+
+// BalanceResponse represents a token balance in the API response
+type BalanceResponse struct {
+	Coin  string `json:"coin"`
+	Total string `json:"total"`
+	Hold  string `json:"hold"`
+}
+
+// OpenOrdersResponse represents open orders in the API response
+type OpenOrdersResponse struct {
+	Perp []OrderResponse `json:"perp"`
+	Spot []OrderResponse `json:"spot"`
+}
+
+// OrderResponse represents an order in the API response
+type OrderResponse struct {
+	Coin      string `json:"coin"`
+	Side      string `json:"side"`
+	LimitPx   string `json:"limit_px"`
+	Size      string `json:"size"`
+	OrderID   int64  `json:"order_id"`
+	Timestamp int64  `json:"timestamp"`
+}
+
+// FundingPaymentResponse represents a funding payment in the API response
+type FundingPaymentResponse struct {
+	Time        int64  `json:"time"`
+	Coin        string `json:"coin"`
+	AmountUSDC  string `json:"amount_usdc"`
+	FundingRate string `json:"funding_rate"`
 }
