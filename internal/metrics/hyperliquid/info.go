@@ -83,20 +83,20 @@ type UserInfo struct {
 
 // PerpState represents the user's perpetual futures trading state.
 type PerpState struct {
-	MarginSummary       MarginSummary     `json:"margin_summary"`
-	CrossMarginSummary  MarginSummary     `json:"cross_margin_summary"`
-	CrossMaintenanceMarginUsed string     `json:"cross_maintenance_margin_used"`
-	Withdrawable        string            `json:"withdrawable"`
-	AssetPositions      []AssetPosition   `json:"asset_positions"`
-	Time                int64             `json:"time"`
+	MarginSummary              MarginSummary   `json:"marginSummary"`
+	CrossMarginSummary         MarginSummary   `json:"crossMarginSummary"`
+	CrossMaintenanceMarginUsed string          `json:"crossMaintenanceMarginUsed"`
+	Withdrawable               string          `json:"withdrawable"`
+	AssetPositions             []AssetPosition `json:"assetPositions"`
+	Time                       int64           `json:"time"`
 }
 
 // MarginSummary contains margin and account value information.
 type MarginSummary struct {
-	AccountValue     string `json:"account_value"`
-	TotalNtlPos      string `json:"total_ntl_pos"`
-	TotalRawUsd      string `json:"total_raw_usd"`
-	TotalMarginUsed  string `json:"total_margin_used"`
+	AccountValue     string `json:"accountValue"`
+	TotalNtlPos      string `json:"totalNtlPos"`
+	TotalRawUsd      string `json:"totalRawUsd"`
+	TotalMarginUsed  string `json:"totalMarginUsed"`
 }
 
 // AssetPosition represents a perpetual position for a specific asset.
@@ -108,16 +108,16 @@ type AssetPosition struct {
 // Position contains detailed information about a trading position.
 type Position struct {
 	Coin            string          `json:"coin"`
-	EntryPx         string          `json:"entry_px,omitempty"`
+	EntryPx         string          `json:"entryPx,omitempty"`
 	Leverage        LeverageInfo    `json:"leverage"`
-	LiquidationPx   string          `json:"liquidation_px,omitempty"`
-	MarginUsed      string          `json:"margin_used"`
-	MaxTradeSzs     []string        `json:"max_trade_szs,omitempty"`
-	PositionValue   string          `json:"position_value"`
-	ReturnOnEquity  string          `json:"return_on_equity,omitempty"`
+	LiquidationPx   string          `json:"liquidationPx,omitempty"`
+	MarginUsed      string          `json:"marginUsed"`
+	MaxTradeSzs     []string        `json:"maxTradeSzs,omitempty"`
+	PositionValue   string          `json:"positionValue"`
+	ReturnOnEquity  string          `json:"returnOnEquity,omitempty"`
 	Szi             string          `json:"szi"`
-	UnrealizedPnl   string          `json:"unrealized_pnl"`
-	CumFunding      *CumFunding     `json:"cum_funding,omitempty"`
+	UnrealizedPnl   string          `json:"unrealizedPnl"`
+	CumFunding      *CumFunding     `json:"cumFunding,omitempty"`
 }
 
 // LeverageInfo represents leverage settings for a position.
@@ -128,9 +128,9 @@ type LeverageInfo struct {
 
 // CumFunding represents cumulative funding information.
 type CumFunding struct {
-	AllTime string `json:"all_time"`
-	SinceChange string `json:"since_change"`
-	SinceOpen string `json:"since_open"`
+	AllTime     string `json:"allTime"`
+	SinceChange string `json:"sinceChange"`
+	SinceOpen   string `json:"sinceOpen"`
 }
 
 // SpotState represents the user's spot trading state.
@@ -144,7 +144,7 @@ type SpotBalance struct {
 	Token    int    `json:"token"`
 	Total    string `json:"total"`
 	Hold     string `json:"hold"`
-	EntryNtl string `json:"entry_ntl"`
+	EntryNtl string `json:"entryNtl"`
 }
 
 // OpenOrdersInfo contains all open orders for a user.
@@ -157,24 +157,24 @@ type OpenOrdersInfo struct {
 type Order struct {
 	Coin        string `json:"coin"`
 	Side        string `json:"side"`
-	LimitPx     string `json:"limit_px"`
+	LimitPx     string `json:"limitPx"`
 	Sz          string `json:"sz"`
 	Oid         int64  `json:"oid"`
 	Timestamp   int64  `json:"timestamp"`
-	OrigSz      string `json:"orig_sz"`
+	OrigSz      string `json:"origSz"`
 	Cloid       string `json:"cloid,omitempty"`
-	OrderType   string `json:"order_type,omitempty"`
-	ReduceOnly  bool   `json:"reduce_only,omitempty"`
+	OrderType   string `json:"orderType,omitempty"`
+	ReduceOnly  bool   `json:"reduceOnly,omitempty"`
 	Tif         string `json:"tif,omitempty"`
 }
 
 // FundingPayment represents a funding payment record.
 type FundingPayment struct {
-	Time    int64  `json:"time"`
-	Coin    string `json:"coin"`
-	UsedC   string `json:"usdc"`
-	Szi     string `json:"szi"`
-	FundingRate string `json:"funding_rate"`
+	Time        int64  `json:"time"`
+	Coin        string `json:"coin"`
+	UsedC       string `json:"usdc"`
+	Szi         string `json:"szi"`
+	FundingRate string `json:"fundingRate"`
 }
 
 // InfoUser fetches comprehensive information about a Hyperliquid user.
