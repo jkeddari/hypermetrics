@@ -1,4 +1,4 @@
-// Package hyperliquid provides functionality to fetch and analyze user data from Hyperliquid DEX.
+// Package user provides functionality to fetch and analyze user data from Hyperliquid DEX.
 //
 // This package offers comprehensive access to user-specific information including:
 //   - Perpetual positions and margin summary
@@ -12,13 +12,13 @@
 //
 // Example usage:
 //
-//	client := hyperliquid.NewClient(nil)
+//	client := user.NewClient(nil)
 //	info, err := client.InfoUser(ctx, "0x...")
 //	if err != nil {
 //	    log.Fatal(err)
 //	}
 //	fmt.Printf("Account Value: %s\n", info.Perp.AccountValue)
-package hyperliquid
+package user
 
 import (
 	"bytes"
@@ -195,7 +195,7 @@ type FundingPayment struct {
 //
 // Example:
 //
-//	client := hyperliquid.NewClient(nil)
+//	client := user.NewClient(nil)
 //	info, err := client.InfoUser(ctx, "0x1234...")
 //	if err != nil {
 //	    return err

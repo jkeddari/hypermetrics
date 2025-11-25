@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jkeddari/hypermetrics/internal/metrics/hyperliquid"
 	"github.com/jkeddari/hypermetrics/internal/metrics/leaderboard"
+	"github.com/jkeddari/hypermetrics/internal/metrics/user"
 )
 
 // Config holds the server configuration.
@@ -41,11 +41,11 @@ func DefaultConfig() *Config {
 
 // Server represents the HTTP server with its dependencies.
 type Server struct {
-	config            *Config
-	leaderboardLive   *leaderboard.LiveLeaderboard
-	hyperliquidClient *hyperliquid.Client
-	httpServer        *http.Server
-	logger            *slog.Logger
+	config          *Config
+	leaderboardLive *leaderboard.LiveLeaderboard
+	userClient      *user.Client
+	httpServer      *http.Server
+	logger          *slog.Logger
 }
 
 // NewServer creates a new Server instance with the given configuration.
@@ -65,14 +65,14 @@ func NewServer(config *Config) (*Server, error) {
 		return nil, fmt.Errorf("server: failed to initialize leaderboard: %w", err)
 	}
 
-	// Initialize Hyperliquid client
-	hlClient := hyperliquid.NewClient(nil)
+	// Initialize user info client
+	userInfoClient := user.NewClient(nil)
 
 	s := &Server{
-		config:            config,
-		leaderboardLive:   lb,
-		hyperliquidClient: hlClient,
-		logger:            config.Logger,
+		config:          config,
+		leaderboardLive: lb,
+		userClient:      userInfoClient,
+		logger:          config.Logger,
 	}
 
 	// Setup HTTP server
@@ -242,7 +242,7 @@ func (s *Server) handleUserInfo(w http.ResponseWriter, r *http.Request) {
 
 	s.logger.Info("fetching user info", "address", address)
 
-	userInfo, err := s.hyperliquidClient.InfoUser(ctx, address)
+	userInfo, err := s.userClient.InfoUser(ctx, address)
 	if err != nil {
 		s.logger.Error("failed to fetch user info", "address", address, "error", err)
 		s.respondError(w, http.StatusInternalServerError, "failed to fetch user information from Hyperliquid")
@@ -256,7 +256,7 @@ func (s *Server) handleUserInfo(w http.ResponseWriter, r *http.Request) {
 }
 
 // buildUserInfoResponse converts internal UserInfo to API response format
-func (s *Server) buildUserInfoResponse(info *hyperliquid.UserInfo) UserInfoResponse {
+func (s *Server) buildUserInfoResponse(info *user.UserInfo) UserInfoResponse {
 	response := UserInfoResponse{
 		Address:   info.Address,
 		UpdatedAt: info.UpdatedAt.Format(time.RFC3339),

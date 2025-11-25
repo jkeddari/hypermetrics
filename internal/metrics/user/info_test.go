@@ -1,4 +1,4 @@
-package hyperliquid
+package user
 
 import (
 	"context"

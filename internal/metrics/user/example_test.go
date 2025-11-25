@@ -1,17 +1,17 @@
-package hyperliquid_test
+package user_test
 
 import (
 	"context"
 	"fmt"
 	"log"
 
-	"github.com/jkeddari/hypermetrics/internal/metrics/hyperliquid"
+	"github.com/jkeddari/hypermetrics/internal/metrics/user"
 )
 
 // ExampleClient_InfoUser demonstrates how to fetch comprehensive user information.
 func ExampleClient_InfoUser() {
 	// Create a new Hyperliquid client
-	client := hyperliquid.NewClient(nil)
+	client := user.NewClient(nil)
 
 	// Fetch user information
 	ctx := context.Background()
@@ -58,7 +58,7 @@ func ExampleClient_InfoUser() {
 // ExampleUserInfo_GetPerpPositions shows how to access perpetual positions.
 func ExampleUserInfo_GetPerpPositions() {
 	// Assuming you have a UserInfo object
-	var info *hyperliquid.UserInfo
+	var info *user.UserInfo
 
 	// Get all perpetual positions
 	positions := info.GetPerpPositions()
@@ -75,7 +75,7 @@ func ExampleUserInfo_GetPerpPositions() {
 // ExampleUserInfo_GetSpotBalances shows how to access spot balances.
 func ExampleUserInfo_GetSpotBalances() {
 	// Assuming you have a UserInfo object
-	var info *hyperliquid.UserInfo
+	var info *user.UserInfo
 
 	// Get all spot balances
 	balances := info.GetSpotBalances()
