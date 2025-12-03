@@ -1,471 +1,208 @@
 # Hypermetrics
 
-> 🚀 Comprehensive real-time metrics and analytics platform for Hyperliquid
+> 📊 Comprehensive analytics and insights platform for Hyperliquid DEX
 
 [![Go Version](https://img.shields.io/badge/go-1.25-blue.svg)](https://go.dev/dl/)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-
-## 🎯 Overview
-
-Hypermetrics is a high-performance Go service that provides comprehensive real-time metrics and analytics for the Hyperliquid decentralized exchange. Built with speed, reliability, and scalability in mind, it offers a REST API to track trading activity, analyze performance, and monitor market movements.
-
-## 🎪 Features & Roadmap
-
-### ✅ Live Leaderboard (v0.1.0)
-- **Lazy-loading cache** with 60-second TTL
-- **On-demand fetching** - Data loaded only when requested
-- **Flexible sorting** across 13 metrics (value, daily/weekly/monthly/alltime × PNL/ROI/Volume)
-- **Thread-safe** concurrent access with RWMutex
-- **Fast response** - <50ms for cached data, 2-5s on cache miss
-- **Scale-to-zero friendly** - No background goroutines, perfect for serverless
-
-### 🔜 Large Position Tracker (Planned)
-- Track and monitor large positions across the platform
-- Real-time alerts for significant position changes
-- Historical position data and trends
-- Filter by size, asset, and timeframe
-
-### 🔜 Wallet Analytics (Planned)
-- Comprehensive wallet-level analytics
-- Track individual address performance
-- Historical trading activity and P&L
-- Position history and current holdings
-- Trading patterns and behavior analysis
-
-### 🔜 Future Enhancements
-- WebSocket support for real-time updates
-- Advanced filtering and search capabilities
-- Data export (CSV, JSON)
-- Custom alerts and notifications
-- Performance benchmarking tools
-
-## ✨ Technical Features
-
-- 🔒 **Thread-safe**: Concurrent access with RWMutex protection
-- ⚡ **Lazy loading**: Data fetched only when needed, cached with TTL
-- 🔄 **Smart caching**: Single-fetch guarantee even with concurrent requests
-- 🐳 **Docker ready**: Multi-stage build optimized for Google Cloud Run
-- 📊 **Comprehensive metrics**: PNL, ROI, and Volume across all time windows
-- 🧪 **Well tested**: 95%+ code coverage with parallel tests
-- 🔧 **Production-ready**: Logging, health checks, graceful shutdown
-- 💰 **Cost-efficient**: True scale-to-zero, no background processes
-
-## 🚀 Quick Start
-
-### Prerequisites
-
-- Go 1.25+
-- Docker (optional)
-- Make (optional, but recommended)
-
-### Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/jkeddari/hypermetrics.git
-cd hypermetrics
-
-# Install dependencies
-go mod download
-
-# Run tests
-make test
-
-# Build and run
-make build
-./hypermetrics
-```
-
-### Using Make
-
-```bash
-# See all available commands
-make help
-
-# Run tests with coverage
-make test-coverage
-
-# Build binary
-make build
-
-# Run server locally
-make run
-
-# Build Docker image
-make docker-build
-
-# Run Docker container
-make docker-run
-```
-
-## 📖 API Documentation
-
-### Current Endpoints (v0.1.0)
-
-#### GET /health
-Health check endpoint to verify server status.
-
-**Response:**
-```json
-{
-  "status": "ok",
-  "timestamp": "2024-11-23T12:34:56Z",
-  "last_refresh": "2024-11-23T12:33:00Z"
-}
-```
-
-#### GET /api/info/leaderboard
-Get Hyperliquid's trading leaderboard with flexible sorting.
-
-**Query Parameters:**
-- `window` (optional): Time window - `daily`, `weekly`, `monthly`, `alltime`
-- `metric` (optional): Metric to sort by - `pnl`, `roi`, `vlm` (volume)
-- `order` (optional): Sort order - `asc`, `desc` (default: `desc`)
-
-**Default behavior:** Returns leaderboard sorted by account value (descending).
-
-**Examples:**
-
-```bash
-# Get leaderboard sorted by account value (default)
-curl http://localhost:8080/api/info/leaderboard
-
-# Get top daily PNL traders
-curl "http://localhost:8080/api/info/leaderboard?window=daily&metric=pnl"
-
-# Get top weekly ROI traders
-curl "http://localhost:8080/api/info/leaderboard?window=weekly&metric=roi"
-
-# Get highest volume traders (monthly)
-curl "http://localhost:8080/api/info/leaderboard?window=monthly&metric=vlm"
-```
-
-**Response Format:**
-```json
-{
-  "rows": [
-    {
-      "ethAddress": "0x...",
-      "accountValue": "123456.789",
-      "dailyPerformance": {
-        "pnl": "1234.56",
-        "roi": "0.0123",
-        "vlm": "100000.00"
-      },
-      "weekPerformance": { ... },
-      "monthPerformance": { ... },
-      "allPerformance": { ... },
-      "prize": 0,
-      "displayName": null
-    }
-  ],
-  "count": 27000,
-  "sort_by": "dailypnl",
-  "order": "desc",
-  "last_refresh": "2024-11-23T12:34:56Z"
-}
-```
-
-### Upcoming Endpoints (Planned)
-
-- `GET /api/positions/large` - Track large positions
-- `GET /api/wallet/{address}` - Get wallet analytics
-- `GET /api/wallet/{address}/history` - Get wallet trading history
-- `GET /api/wallet/{address}/positions` - Get current positions
-
-## Starting the Server
-
-```bash
-# Build the server
-go build -o hypermetrics ./cmd/server
-
-# Run with default settings (listens on :8080)
-./hypermetrics
-
-# Run on a custom port
-./hypermetrics -addr :3000
-```
-
-## Configuration
-
-Server configuration can be customized via:
-
-- **Command-line flags**: `-addr` for listen address
-- **Code**: Modify `server.Config` struct for advanced settings (timeouts, etc.)
-
-## Architecture
-
-```
-┌─────────────────┐
-│  HTTP Client    │
-└────────┬────────┘
-         │ GET /api/info/leaderboard
-         ▼
-┌─────────────────┐
-│  HTTP Server    │
-│  (port 8080)    │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│ LiveLeaderboard │ ◄─── Auto-refresh (60s)
-│  (in-memory)    │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│ Hyperliquid API │
-│  (external)     │
-└─────────────────┘
-```
-
-## Development
-
-### Running Tests
-
-```bash
-# Run all tests
-go test ./...
-
-# Run with coverage
-go test -cover ./...
-
-# Run specific package tests
-go test ./internal/metrics/leaderboard/...
-```
-
-### Building
-
-```bash
-# Build binary
-go build -o hypermetrics ./cmd/server
-
-# Build with optimizations
-go build -ldflags="-s -w" -o hypermetrics ./cmd/server
-```
-
-## 🏗️ Project Structure
-
-```
-.
-├── cmd/
-│   └── server/             # Main application entry point
-├── internal/
-│   ├── metrics/
-│   │   └── leaderboard/    # Live leaderboard tracking (v0.1.0)
-│   │   └── positions/      # Large position tracker (planned)
-│   │   └── wallet/         # Wallet analytics (planned)
-│   ├── server/             # HTTP server implementation
-│   └── utils/              # Utility functions
-├── Dockerfile.backend      # Multi-stage Docker build (backend API)
-├── Makefile               # Build automation
-├── COST_ESTIMATION.md     # Google Cloud Run cost analysis
-├── DEPLOYMENT.md          # Deployment guide
-├── QUICKSTART.md          # Quick start guide
-└── README.md              # This file
-```
-
-## 🧪 Testing
-
-```bash
-# Run all tests
-make test
-
-# Run tests with coverage report
-make test-coverage
-
-# Run specific package tests
-go test ./internal/metrics/leaderboard/... -v
-
-# Run with race detector
-go test -race ./...
-```
-
-## 🐳 Docker
-
-### Build and Run Locally
-
-```bash
-# Build image
-make docker-build
-
-# Run container
-make docker-run
-
-# Or manually
-docker build -t hypermetrics .
-docker run -p 8080:8080 hypermetrics
-```
-
-### Multi-platform Build
-
-```bash
-# Build for linux/amd64 (Cloud Run)
-docker buildx build --platform linux/amd64 -t hypermetrics:latest .
-```
-
-## ☁️ Deployment
-
-### Google Cloud Run
-
-Detailed deployment instructions are in [DEPLOYMENT.md](DEPLOYMENT.md)
-
-**Quick deploy:**
-
-```bash
-# Set your project
-gcloud config set project YOUR_PROJECT_ID
-
-# Deploy directly from source
-gcloud run deploy hypermetrics \
-  --source . \
-  --platform managed \
-  --region us-central1 \
-  --allow-unauthenticated
-```
-
-**With Cloud Build:**
-
-```bash
-# Submit to Cloud Build
-gcloud builds submit --config cloudbuild.yaml
-```
-
-## 🔧 Configuration
-
-### Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `PORT` | Server listen port | `8080` |
-
-### Command-line Flags
-
-```bash
-./hypermetrics -addr :3000  # Run on custom port
-```
-
-## 📊 Performance
-
-- **Memory usage**: ~200-300 MB when cache is populated, ~50 MB when idle
-- **Startup time**: <1 second (no initial data fetch, lazy loading)
-- **Request latency**: 
-  - Cache HIT (within 60s TTL): <50ms
-  - Cache MISS (first request or expired): 2-5 seconds
-- **Cache TTL**: 60 seconds (configurable)
-- **Test suite**: <2 seconds (parallel execution with cached data)
-- **Concurrent requests**: Handles 1000+ req/s, single fetch during cache miss
-- **Serverless-friendly**: True scale-to-zero with no background goroutines
-
-## 💰 Cost Estimation (Google Cloud Run)
-
-| Traffic Volume | Cache HIT Rate | Monthly Cost | Cost per Request |
-|----------------|----------------|--------------|------------------|
-| 30K req/month (Dev) | 50% | **$0.00** | $0.000000 |
-| 1.5M req/month (Low) | 80% | **$15.39** | $0.000010 |
-| 6M req/month (Medium) | 90% | **$46.10** | $0.000008 |
-| 30M req/month (High) | 95% | **$158.80** | $0.000005 |
-
-**Key advantages:**
-- ✅ **Free Tier**: First 30-50K requests/month are FREE
-- ✅ **Scale-to-zero**: $0 cost when idle
-- ✅ **Pay-per-use**: Only pay for actual usage
-- ✅ **Cache optimization**: 80-95% cache HIT rate drastically reduces costs
-
-📋 **Detailed analysis**: See [COST_ESTIMATION.md](COST_ESTIMATION.md) for complete breakdown, comparisons, and optimization strategies.
-
-**Recommended starting budget**: $20-30/month
-
-## 🛠️ Development
-
-### Prerequisites
-
-```bash
-# Install development tools
-make install-tools
-```
-
-This installs:
-- `staticcheck` - Static analysis
-- `gosec` - Security scanner
-
-### Linting
-
-```bash
-# Run all linters
-make lint
-
-# Individual linters
-make fmt    # Format code
-make vet    # Run go vet
-make sec    # Run gosec
-```
-
-### CI/CD
-
-You can set up your own CI/CD pipeline using the provided `Makefile` targets:
-- `make ci` - Run full CI pipeline (lint + test + build)
-- `make all` - Run complete build with cleanup
-
-## 🤝 Contributing
-
-Contributions are welcome! Please:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-### Code Standards
-
-- Follow Go best practices and idioms
-- Write tests for new features
-- Run `make lint` before committing
-- Update documentation as needed
-
-## 📝 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🗺️ Development Roadmap
-
-### Phase 1: Foundation ✅
-- [x] Project setup and architecture
-- [x] Live leaderboard tracking
-- [x] REST API implementation
-- [x] Docker deployment
-- [x] Comprehensive testing
-
-### Phase 2: Position Tracking 🚧
-- [ ] Large position tracker implementation
-- [ ] Real-time position monitoring
-- [ ] Position change alerts
-- [ ] Historical position data
-
-### Phase 3: Wallet Analytics 📋
-- [x] Wallet-level analytics
-- [x] Individual address tracking
-- [x] Trading history and P&L
-- [x] Position portfolio tracking
-
-### Phase 4: Advanced Features 🔮
-- [ ] WebSocket support for real-time updates
-- [ ] Advanced filtering and search
-- [ ] Data export capabilities
-- [ ] Custom alerts system
-- [ ] Performance benchmarking
-
-## 🙏 Acknowledgments
-
-- Hyperliquid for providing the API
-- The Go community for excellent tools and libraries
-
-## 📧 Contact
-
-- GitHub: [@jkeddari](https://github.com/jkeddari)
-- Issues: [GitHub Issues](https://github.com/jkeddari/hypermetrics/issues)
+[![Private](https://img.shields.io/badge/status-private-red.svg)]()
 
 ---
 
-**Built with ❤️ using Go**
+## 🎯 Overview
+
+**Hypermetrics** is a high-performance analytics platform that provides real-time insights about the Hyperliquid decentralized exchange. Built with Go for speed and reliability, it delivers comprehensive visibility into trader activity and performance metrics.
+
+The platform answers critical questions about Hyperliquid's ecosystem:
+- Who are the top traders and how are they performing?
+- How is any specific address performing across perpetuals and spot markets?
+- What are the real-time positions, balances, and P&L for any trader?
+
+## ✨ Current Features
+
+### 🏆 Leaderboard Tracking
+
+Track and analyze top traders on Hyperliquid with comprehensive sorting capabilities:
+- **Flexible Sorting** - Rank by account value, PNL, ROI, or trading volume
+- **Time Windows** - View performance across daily, weekly, monthly, or all-time periods
+- **Real-time Updates** - Fresh data with intelligent caching (60-second TTL)
+- **27,000+ Traders** - Complete coverage of the Hyperliquid trading community
+- **13+ Metric Combinations** - Sort by value, or any combination of window × metric (e.g., daily PNL, weekly ROI, monthly volume)
+
+**Performance:**
+- Cache HIT: <50ms response time
+- Cache MISS: 2-5 seconds (fetches fresh data from Hyperliquid)
+- Thread-safe concurrent access with single-fetch guarantee
+
+**API Endpoint:** `GET /api/info/leaderboard?window={daily|weekly|monthly|alltime}&metric={pnl|roi|vlm}&order={asc|desc}`
+
+---
+
+### 👤 Address Analytics
+
+Deep dive into any Ethereum address on Hyperliquid with comprehensive data aggregation:
+
+**Account Overview:**
+- Total account value
+- Withdrawable balance
+- Total margin used (cross and isolated)
+
+**Perpetual Positions:**
+- Active positions with entry price and current size
+- Leverage (cross or isolated) and liquidation price
+- Unrealized P&L and position value
+- Margin requirements per position
+
+**Spot Holdings:**
+- Token balances across all available markets
+- Total and held amounts per coin
+
+**Open Orders:**
+- Current limit orders for both perp and spot markets
+- Order details: side, price, size, timestamp
+
+**Funding Payments:**
+- Historical funding payment data (30-day history)
+- Per-coin funding rates and USDC amounts
+
+**Performance:**
+- Response time: 2-5 seconds (aggregates 4 separate API calls)
+- Rate-limited at 10 requests/second for API protection
+- Fresh data on every request (no caching)
+
+**API Endpoint:** `GET /api/info/user/{address}`
+
+---
+
+### 🏥 Health Monitoring
+
+System health check endpoint for monitoring and orchestration:
+- Server status indicator
+- Current timestamp
+- Last leaderboard cache refresh time
+
+**API Endpoint:** `GET /health`
+
+---
+
+## 🏗️ Technical Architecture
+
+### Design Principles
+
+**Serverless-First Approach:**
+- **Lazy Loading** - Data fetched on-demand, not at startup
+- **Smart Caching** - 60-second TTL cache for leaderboard data
+- **Scale-to-Zero** - No background processes or goroutines
+- **Cost-Efficient** - Perfect for Google Cloud Run and similar platforms
+
+**Performance Characteristics:**
+- Startup time: <1 second (no initial data load)
+- Memory usage: ~50MB idle, ~200-300MB with populated cache
+- Concurrent requests: Handles 1000+ req/s
+- Thread-safe: RWMutex protection with double-check locking pattern
+
+### Technology Stack
+
+- **Language:** Go 1.25+
+- **API:** RESTful HTTP endpoints with JSON responses
+- **Caching:** In-memory with TTL-based expiration (leaderboard only)
+- **Concurrency:** Thread-safe with RWMutex and fetch mutex
+- **Deployment:** Docker-ready, optimized for Google Cloud Run
+- **Logging:** Structured JSON logging with request middleware
+
+### Key Features
+
+- ✅ Thread-safe concurrent access patterns
+- ✅ Intelligent caching with single-fetch guarantee
+- ✅ Rate limiting for external API calls (10-20 req/s)
+- ✅ Graceful shutdown with signal handling
+- ✅ Production-ready error handling and logging
+- ✅ Comprehensive test coverage (95%+)
+
+---
+
+## 🗺️ Roadmap
+
+### Phase 1: Position Tracking 🚧 *In Progress*
+
+Real-time whale monitoring and large position tracking:
+- [ ] **Position Aggregation** - Aggregate positions across top traders
+- [ ] **Large Position Detection** - Identify and track positions above configurable thresholds
+- [ ] **Flexible Filtering** - Filter by minimum value, asset type, and leverage
+- [ ] **Batch Optimization** - Efficient batch fetching with sequential fallback
+- [ ] **API Endpoint** - `GET /api/positions/large` with query parameters
+
+**Use Cases:**
+- Identify large concentrated positions in specific assets
+- Monitor high-leverage trades (≥10x)
+- Track whale entry/exit activity
+- Detect potential liquidation risks
+
+---
+
+### Phase 2: Protocol Metrics 📋 *Planned*
+
+Track core Hyperliquid protocol indicators:
+- [ ] **Total HYPE Staked** - Monitor staking participation and protocol security
+- [ ] **Funding Rates** - Real-time funding rates across all perpetual markets
+- [ ] **HYPE Buyback Activity** - Protocol buyback volume and frequency
+- [ ] **Daily Generated Fees** - Revenue metrics and protocol health
+- [ ] **Global Trading Volume** - Aggregate trading activity across markets
+- [ ] **Open Interest** - Total notional value of open positions
+- [ ] **API Endpoint** - `GET /api/protocol/metrics`
+
+---
+
+### Phase 3: Advanced Features 🔮 *Future*
+
+**Near-Term:**
+- [ ] **Historical Data** - Time-series data for positions, balances, and performance
+- [ ] **WebSocket Support** - Real-time streaming updates for positions and leaderboard
+- [ ] **Advanced Filtering** - Complex queries across multiple dimensions
+- [ ] **Position Change Detection** - Track and alert on significant position changes
+
+**Mid-Term:**
+- [ ] **Alert System** - Customizable notifications for whale activity and liquidations
+- [ ] **Trade History Analysis** - Comprehensive fill history and performance attribution
+- [ ] **Data Export** - CSV/JSON exports for external analysis
+
+**Long-Term:**
+- [ ] **Predictive Analytics** - ML-powered insights on trader behavior
+- [ ] **Cross-Protocol Integration** - Comparative analytics across multiple DEXs
+- [ ] **Social Features** - Trader following and community insights
+- [ ] **Performance Benchmarking** - Compare performance against market segments
+
+---
+
+## 📊 Current Status
+
+### Implemented & Production-Ready ✅
+- Live leaderboard tracking with flexible sorting (13+ metrics)
+- Comprehensive wallet analytics for any address
+- RESTful API with health checks
+- Thread-safe concurrent access with smart caching
+- Structured logging and error handling
+- Graceful shutdown and signal handling
+- Rate limiting for API protection
+
+### In Active Development 🚧
+- Large position tracking and whale monitoring
+- Position aggregation across top traders
+- Batch API optimization with fallback strategies
+
+### Planned for Future Releases 📋
+- Protocol-level metrics (staking, fees, buybacks)
+- Historical data and time-series analysis
+- Real-time alerting infrastructure
+- WebSocket streaming
+- Advanced data export and visualization
+
+---
+
+## 🔒 License
+
+This is a **private project**. All rights reserved.
+
+Unauthorized copying, distribution, or use of this software is strictly prohibited.
+
+---
+
+**Built with ⚡ by [@jkeddari](https://github.com/jkeddari)**

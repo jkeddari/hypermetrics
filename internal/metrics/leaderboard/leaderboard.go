@@ -366,7 +366,8 @@ func (l *LiveLeaderboard) SortBoards(sortCode string, desc bool) ([]LeaderBoardR
 	return board, nil
 }
 
-// AddressList returns all Ethereum addresses from the leaderboard.
+// AddressList returns all Ethereum addresses from the leaderboard
+// which total value is more than value in parameters.
 //
 // This method triggers lazy loading: if the cache is expired or empty, it fetches fresh data
 // from Hyperliquid's API before extracting addresses.
@@ -376,7 +377,7 @@ func (l *LiveLeaderboard) SortBoards(sortCode string, desc bool) ([]LeaderBoardR
 //   - Cache MISS: 2-5 seconds (includes API fetch)
 //
 // Returns an empty slice if data fetch fails. Check logs for errors.
-func (l *LiveLeaderboard) AddressList() []string {
+func (l *LiveLeaderboard) AddressList(value float64) []string {
 	// Ensure we have fresh data (lazy load if needed)
 	if err := l.ensureFreshData(); err != nil {
 		l.logger.Error("failed to fetch leaderboard for address list", "error", err)
@@ -389,9 +390,11 @@ func (l *LiveLeaderboard) AddressList() []string {
 	copy(board, l.board)
 	l.mu.RUnlock()
 
-	addresses := make([]string, 0, len(board))
+	var addresses []string
 	for _, row := range board {
-		addresses = append(addresses, row.EthAddress)
+		if parseFloat(row.AccountValue) >= value {
+			addresses = append(addresses, row.EthAddress)
+		}
 	}
 	return addresses
 }

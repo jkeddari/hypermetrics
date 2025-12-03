@@ -83,7 +83,7 @@ func TestFetchPerpState(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	state, err := client.fetchPerpState(ctx, testAddress)
+	state, err := client.FetchPerpState(ctx, testAddress)
 	require.NoError(t, err)
 	require.NotNil(t, state)
 
@@ -396,4 +396,104 @@ func TestInfoUser_Timeout(t *testing.T) {
 
 	_, err := client.InfoUser(ctx, testAddress)
 	assert.Error(t, err)
+}
+
+func TestBatchPerpStates_Integration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	client := NewClient(nil)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Test with multiple addresses from top traders
+	addresses := []string{
+		"0x5d2f4460ac3514ada79f5d9838916e508ab39bb7",
+		"0x010461c14e146ac35fe42271bdc1134ee31c703a",
+		"0x31ca8395cf837de08b24da3f660e77761dfb974b",
+	}
+
+	t.Run("batch fetch multiple addresses", func(t *testing.T) {
+		states, err := client.BatchPerpStates(ctx, addresses)
+		require.NoError(t, err)
+		require.NotNil(t, states)
+
+		// Should have one state per address
+		assert.Equal(t, len(addresses), len(states))
+
+		// Verify each state
+		for _, addr := range addresses {
+			state, exists := states[addr]
+			assert.True(t, exists, "state should exist for address %s", addr)
+			assert.NotNil(t, state, "state should not be nil for address %s", addr)
+
+			// Verify state has expected fields
+			if state != nil {
+				assert.NotEmpty(t, state.MarginSummary.AccountValue)
+				assert.NotEmpty(t, state.Withdrawable)
+				// Asset positions might be empty if user has no positions
+				assert.NotNil(t, state.AssetPositions)
+			}
+		}
+
+		t.Logf("Successfully fetched %d states", len(states))
+	})
+
+	t.Run("empty addresses list", func(t *testing.T) {
+		states, err := client.BatchPerpStates(ctx, []string{})
+		require.NoError(t, err)
+		assert.NotNil(t, states)
+		assert.Equal(t, 0, len(states))
+	})
+
+	t.Run("single address", func(t *testing.T) {
+		states, err := client.BatchPerpStates(ctx, []string{testAddress})
+		require.NoError(t, err)
+		require.NotNil(t, states)
+		assert.Equal(t, 1, len(states))
+
+		state := states[testAddress]
+		assert.NotNil(t, state)
+		assert.NotEmpty(t, state.MarginSummary.AccountValue)
+	})
+}
+
+func TestBatchPerpStates_Performance(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping performance test in short mode")
+	}
+
+	client := NewClient(nil)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	defer cancel()
+
+	// Get 20 top addresses for performance test
+	addresses := []string{
+		"0x5d2f4460ac3514ada79f5d9838916e508ab39bb7",
+		"0x010461c14e146ac35fe42271bdc1134ee31c703a",
+		"0x31ca8395cf837de08b24da3f660e77761dfb974b",
+		"0x24de6b77e8bc31c40aa452926daa6bbab7a71b0f",
+		"0x393d0b87ed38fc779fd9611144ae649ba6082109",
+		"0xa822a9ceb6d6cb5b565bd10098abcfa9cf18d748",
+		"0xdfc24b077bc1425ad1dea75bcb6f8158e10df303",
+		"0xe6111266afdcdf0b1fe8505028cc1f7419d798a7",
+		"0x01d734e9e7847248864c2c7bbab16c4d5e04a990",
+		"0x2ba553d9f990a3b66b03b2dc0d030dfc1c061036",
+	}
+
+	start := time.Now()
+	states, err := client.BatchPerpStates(ctx, addresses)
+	duration := time.Since(start)
+
+	require.NoError(t, err)
+	require.NotNil(t, states)
+	assert.Equal(t, len(addresses), len(states))
+
+	t.Logf("Batch fetch of %d addresses took %v", len(addresses), duration)
+	t.Logf("Average per address: %v", duration/time.Duration(len(addresses)))
+
+	// Batch should be much faster than individual requests
+	// Expect < 10 seconds for 10 addresses
+	assert.Less(t, duration, 10*time.Second, "batch fetch should complete in < 10s")
 }

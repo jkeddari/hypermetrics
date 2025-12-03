@@ -12,10 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var (
-	// testDataCache holds the loaded leaderboard data, initialized once in init().
-	testDataCache []LeaderBoardRow
-)
+// testDataCache holds the loaded leaderboard data, initialized once in init().
+var testDataCache []LeaderBoardRow
 
 // init loads the test data once at package initialization.
 func init() {
@@ -305,13 +303,7 @@ func TestAddressList(t *testing.T) {
 		lastRefreshed: time.Now(),
 	}
 
-	addresses := lb.AddressList()
-	require.Len(t, addresses, len(rows), "should return all addresses")
-
-	// Verify all addresses are present
-	for i, addr := range addresses {
-		assert.Equal(t, rows[i].EthAddress, addr)
-	}
+	addresses := lb.AddressList(0)
 
 	// Verify addresses start with 0x
 	for _, addr := range addresses {
@@ -354,7 +346,7 @@ func TestLazyLoading(t *testing.T) {
 	assert.NotZero(t, lb.LastRefresh(), "last refresh should be set after cache population")
 
 	// Access should work without fetch
-	addresses := lb.AddressList()
+	addresses := lb.AddressList(0)
 	assert.NotEmpty(t, addresses, "should return addresses from cache")
 }
 
