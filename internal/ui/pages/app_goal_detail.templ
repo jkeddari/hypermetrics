@@ -1,0 +1,395 @@
+package pages
+
+import (
+	"fmt"
+	"github.com/jkeddari/hypermetrics/internal/model"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/badge"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/button"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/card"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/csrf"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/datepicker"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/dialog"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/dropdown"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/icon"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/input"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/label"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/progress"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/textarea"
+	"github.com/jkeddari/hypermetrics/internal/ui/layouts"
+	"time"
+)
+
+templ GoalDetail(goal *model.Goal, entries []*model.GoalEntry) {
+	@layouts.App(goal.Title) {
+		<div id="goal-detail-content">
+			@GoalDetailContent(goal, entries)
+		</div>
+		<div id="goal-entry-dialog-container"></div>
+		<div id="goal-edit-dialog-container"></div>
+		<div id="goal-delete-dialog-container"></div>
+		<script nonce={ templ.GetNonce(ctx) }>
+			document.addEventListener('htmx:afterSwap', function(evt) {
+				if (evt.detail.target?.id === 'goal-detail-content') {
+					['goal-entry-dialog-container', 'goal-edit-dialog-container', 'goal-delete-dialog-container'].forEach(containerId => {
+						const container = document.getElementById(containerId);
+						if (container) {
+							const content = container.querySelector('[data-tui-dialog-content]');
+							const instanceId = content?.getAttribute('data-dialog-instance');
+							if (instanceId && window.tui?.dialog?.close) {
+								window.tui.dialog.close(instanceId);
+							}
+						}
+					});
+				}
+			});
+		</script>
+	}
+}
+
+templ GoalDetailContent(goal *model.Goal, entries []*model.GoalEntry) {
+	<div class="container max-w-7xl px-6 py-8">
+		<!-- Header -->
+		<div class="mb-8">
+			<div class="flex items-center gap-4 mb-4">
+				<a href="/app/goals">
+					@button.Button(button.Props{Variant: button.VariantOutline, Size: button.SizeSm}) {
+						@icon.MoveLeft()
+						Back
+					}
+				</a>
+			</div>
+			<div class="flex items-start justify-between">
+				<div class="flex-1">
+					<h1 class="text-3xl font-bold">{ goal.Title }</h1>
+					if goal.Description != "" {
+						<p class="text-muted-foreground mt-2">{ goal.Description }</p>
+					}
+				</div>
+				<div class="flex items-center gap-2">
+					if goal.Status == model.GoalStatusActive {
+						@badge.Badge() {
+							Active
+						}
+					} else {
+						@badge.Badge(badge.Props{Class: "bg-blue-600 text-white"}) {
+							Completed
+						}
+					}
+					<!-- Actions Dropdown -->
+					@dropdown.Dropdown(dropdown.Props{ID: "goal-actions-dropdown"}) {
+						@dropdown.Trigger() {
+							@button.Button(button.Props{Variant: button.VariantOutline, Size: button.SizeIcon}) {
+								@icon.EllipsisVertical()
+							}
+						}
+						@dropdown.Content() {
+							@dropdown.Item(dropdown.ItemProps{
+								Attributes: templ.Attributes{
+									"hx-get":    fmt.Sprintf("/app/goals/%s/edit-dialog", goal.ID),
+									"hx-target": "#goal-edit-dialog-container",
+									"hx-swap":   "innerHTML",
+								},
+							}) {
+								Edit Goal
+							}
+							@dropdown.Separator()
+							@dropdown.Item(dropdown.ItemProps{
+								Attributes: templ.Attributes{
+									"hx-get":    fmt.Sprintf("/app/goals/%s/delete-dialog", goal.ID),
+									"hx-target": "#goal-delete-dialog-container",
+									"hx-swap":   "innerHTML",
+								},
+							}) {
+								<span class="text-destructive">Delete Goal</span>
+							}
+						}
+					}
+				</div>
+			</div>
+			<!-- Progress Bar -->
+			<div class="mt-6">
+				@card.Card() {
+					@card.Content() {
+						<div class="space-y-2">
+							<div class="flex items-center justify-between">
+								<span class="text-sm font-medium">Progress</span>
+								<span class="text-2xl font-bold">{ fmt.Sprintf("%d/100", goal.CurrentStep) }</span>
+							</div>
+							@progress.Progress(progress.Props{
+								Value: goal.CurrentStep,
+								Max:   100,
+								Size:  progress.SizeLg,
+							})
+						</div>
+					}
+				}
+			</div>
+		</div>
+		<!-- 100 Steps Grid -->
+		<div>
+			<h2 class="text-xl font-semibold mb-4">Steps</h2>
+			<div class="grid grid-cols-5 sm:grid-cols-10 gap-2">
+				for _, entry := range entries {
+					@GoalStepCheckbox(goal, entry)
+				}
+			</div>
+		</div>
+		<!-- Notes Timeline -->
+		{{ entriesWithNotes := []*model.GoalEntry{} }}
+		for _, e := range entries {
+			if e.Note != "" {
+				{{ entriesWithNotes = append(entriesWithNotes, e) }}
+			}
+		}
+		if len(entriesWithNotes) > 0 {
+			<div class="mt-8">
+				<h2 class="text-xl font-semibold mb-4">Notes</h2>
+				<div class="space-y-3">
+					for _, entry := range entriesWithNotes {
+						<a
+							hx-get={ fmt.Sprintf("/app/goals/%s/entries/%d/dialog", goal.ID, entry.Step) }
+							hx-target="#goal-entry-dialog-container"
+							hx-swap="innerHTML"
+							class="block cursor-pointer"
+						>
+							@card.Card() {
+								@card.Content() {
+									<div class="flex gap-3 items-start">
+										<div class="flex-shrink-0">
+											<span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-semibold text-sm">
+												{ fmt.Sprintf("%d", entry.Step) }
+											</span>
+										</div>
+										<div class="flex-1 min-w-0">
+											<p class="text-sm text-muted-foreground line-clamp-2">{ entry.Note }</p>
+											if entry.CompletedAt != nil {
+												<p class="text-xs text-muted-foreground mt-1">
+													{ entry.CompletedAt.Format("Jan 2, 2006 at 3:04 PM") }
+												</p>
+											}
+										</div>
+									</div>
+								}
+							}
+						</a>
+					}
+				</div>
+			</div>
+		}
+	</div>
+}
+
+templ GoalEditDialog(goal *model.Goal) {
+	@dialog.Content(dialog.ContentProps{
+		ID:   "edit-goal-dialog",
+		Open: true,
+	}) {
+		@dialog.Header() {
+			@dialog.Title() {
+				Edit Goal
+			}
+		}
+		<form hx-put={ fmt.Sprintf("/app/goals/%s", goal.ID) } hx-target="#goal-detail-content" class="space-y-4">
+			@csrf.Token()
+			<div>
+				@label.Label(label.Props{For: "title"}) {
+					Goal Title
+				}
+				@input.Input(input.Props{
+					ID:          "title",
+					Name:        "title",
+					Type:        "text",
+					Value:       goal.Title,
+					Placeholder: "e.g., Learn Spanish, Do 100 Pushups",
+				})
+			</div>
+			<div>
+				@label.Label(label.Props{For: "description"}) {
+					Description
+				}
+				@textarea.Textarea(textarea.Props{
+					ID:          "description",
+					Name:        "description",
+					Value:       goal.Description,
+					Placeholder: "What do you want to achieve?",
+					Rows:        4,
+				})
+			</div>
+			<div class="flex justify-end gap-2">
+				@dialog.Close(dialog.CloseProps{For: "edit-goal-dialog"}) {
+					@button.Button(button.Props{Variant: button.VariantOutline, Type: "button"}) {
+						Cancel
+					}
+				}
+				@button.Button(button.Props{Type: "submit"}) {
+					Save Changes
+				}
+			</div>
+		</form>
+	}
+}
+
+templ GoalDeleteDialog(goal *model.Goal) {
+	@dialog.Content(dialog.ContentProps{
+		ID:   "delete-goal-dialog",
+		Open: true,
+	}) {
+		@dialog.Header() {
+			@dialog.Title() {
+				Delete Goal
+			}
+		}
+		<div class="space-y-4">
+			<p class="text-sm text-muted-foreground">
+				Are you sure you want to delete "<strong>{ goal.Title }</strong>"? This action cannot be undone.
+			</p>
+			<div class="flex justify-end gap-2">
+				@dialog.Close(dialog.CloseProps{For: "delete-goal-dialog"}) {
+					@button.Button(button.Props{Variant: button.VariantOutline, Type: "button"}) {
+						Cancel
+					}
+				}
+				@button.Button(button.Props{
+					Type: "button",
+					Attributes: templ.Attributes{
+						"hx-delete": fmt.Sprintf("/app/goals/%s", goal.ID),
+					},
+				}) {
+					Delete Goal
+				}
+			</div>
+		</div>
+	}
+}
+
+templ GoalEntryDialog(goal *model.Goal, entry *model.GoalEntry) {
+	{{ canDelete := entry.Step == goal.CurrentStep }}
+	{{ completedAtValue := time.Now() }}
+	if entry.CompletedAt != nil {
+		{{ completedAtValue = *entry.CompletedAt }}
+	}
+	@dialog.Content(dialog.ContentProps{
+		ID:   fmt.Sprintf("goal-entry-%d-dialog", entry.Step),
+		Open: true,
+	}) {
+		@dialog.Header() {
+			@dialog.Title() {
+				Step { fmt.Sprintf("%d", entry.Step) }
+			}
+			@dialog.Description() {
+				Edit your entry details
+			}
+		}
+		<form
+			hx-patch={ fmt.Sprintf("/app/goals/%s/entries/%d", goal.ID, entry.Step) }
+			hx-target="#goal-detail-content"
+			hx-swap="innerHTML"
+			class="space-y-4"
+		>
+			@csrf.Token()
+			<!-- Completed At -->
+			<div>
+				@label.Label(label.Props{For: "completed_at"}) {
+					Completed At
+				}
+				@datepicker.DatePicker(datepicker.Props{
+					ID:          "completed_at",
+					Name:        "completed_at",
+					Value:       completedAtValue,
+					Placeholder: "Select date",
+				})
+			</div>
+			<!-- Notes -->
+			<div>
+				@label.Label(label.Props{For: "note"}) {
+					Notes
+				}
+				@textarea.Textarea(textarea.Props{
+					ID:          "note",
+					Name:        "note",
+					Placeholder: "What did you accomplish?",
+					Rows:        4,
+					Value:       entry.Note,
+					Attributes:  templ.Attributes{"autofocus": "true"},
+				})
+			</div>
+			@dialog.Footer() {
+				<div class="flex justify-between w-full">
+					<div>
+						if canDelete {
+							@button.Button(button.Props{
+								Type: "button",
+								Attributes: templ.Attributes{
+									"hx-delete":  fmt.Sprintf("/app/goals/%s/entries/%d", goal.ID, entry.Step),
+									"hx-target":  "#goal-detail-content",
+									"hx-swap":    "innerHTML",
+									"hx-confirm": "Are you sure you want to uncomplete this step?",
+								},
+							}) {
+								Uncomplete
+							}
+						}
+					</div>
+					<div class="flex gap-2">
+						@dialog.Close(dialog.CloseProps{For: fmt.Sprintf("goal-entry-%d-dialog", entry.Step)}) {
+							@button.Button(button.Props{Variant: button.VariantOutline, Type: "button"}) {
+								Cancel
+							}
+						}
+						@button.Button(button.Props{Type: "submit"}) {
+							Save Changes
+						}
+					</div>
+				</div>
+			}
+		</form>
+	}
+}
+
+templ GoalStepCheckbox(goal *model.Goal, entry *model.GoalEntry) {
+	{{ isCompleted := entry.Completed }}
+	{{ isNext := !isCompleted && entry.Step == goal.CurrentStep+1 }}
+	{{ isLocked := !isCompleted && entry.Step > goal.CurrentStep+1 }}
+	{{ canClick := isCompleted || isNext }}
+	{{ checkboxID := fmt.Sprintf("step-%d", entry.Step) }}
+	<!-- Hidden Checkbox -->
+	<input
+		type="checkbox"
+		id={ checkboxID }
+		class="hidden"
+		if isCompleted {
+			checked
+		}
+		if !canClick {
+			disabled
+		}
+	/>
+	<!-- Label Wrapper -->
+	<label
+		for={ checkboxID }
+		class={
+			"relative aspect-square flex items-center justify-center rounded-lg font-medium text-sm transition-all",
+			templ.KV("bg-green-100 text-green-700 cursor-pointer hover:bg-green-200", isCompleted),
+			templ.KV("bg-blue-50 text-blue-700 cursor-pointer hover:bg-blue-100 ring-2 ring-blue-300", isNext),
+			templ.KV("bg-muted text-muted-foreground cursor-not-allowed opacity-50", isLocked),
+		}
+		if isNext {
+			hx-post={ fmt.Sprintf("/app/goals/%s/entries/%d/complete", goal.ID, entry.Step) }
+			hx-target="#goal-detail-content"
+			hx-swap="innerHTML"
+		}
+		if isCompleted {
+			hx-get={ fmt.Sprintf("/app/goals/%s/entries/%d/dialog", goal.ID, entry.Step) }
+			hx-target="#goal-entry-dialog-container"
+			hx-swap="innerHTML"
+		}
+	>
+		<span>{ fmt.Sprintf("%d", entry.Step) }</span>
+		if isCompleted {
+			<span class="absolute top-1 right-1 text-green-600">✓</span>
+		}
+		if isNext {
+			<span class="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span>
+		}
+	</label>
+}

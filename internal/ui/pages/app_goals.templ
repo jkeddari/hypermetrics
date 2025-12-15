@@ -1,0 +1,297 @@
+package pages
+
+import (
+	"fmt"
+	"github.com/jkeddari/hypermetrics/internal/ctxkeys"
+	"github.com/jkeddari/hypermetrics/internal/model"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/alert"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/badge"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/button"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/card"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/csrf"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/dialog"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/input"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/label"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/progress"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/tabs"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/textarea"
+	"github.com/jkeddari/hypermetrics/internal/ui/layouts"
+)
+
+func pluralize(word string, count int) string {
+	if count == 1 {
+		return word
+	}
+	return word + "s"
+}
+
+templ Goals(goals []*model.Goal, sortBy string) {
+	@layouts.App("Goals") {
+		<div class="container max-w-7xl px-6 py-8">
+			<div class="mb-8">
+				<h1 class="text-3xl font-bold">Law of 100</h1>
+				<p class="text-muted-foreground mt-2">Do something 100 times to master it</p>
+			</div>
+			@GoalsContent(goals, sortBy)
+			@dialog.Dialog(dialog.Props{ID: "create-goal-dialog"}) {
+				@GoalsCreateDialog()
+			}
+			<script nonce={ templ.GetNonce(ctx) }>
+				// Reset form when cancel button is clicked
+				document.addEventListener('click', e => {
+					const btn = e.target.closest('[data-reset-form]');
+					if (btn) {
+						btn.closest('form')?.reset();
+					}
+				});
+
+				// Close dialog and reset form after HTMX swap
+				document.addEventListener('htmx:afterSwap', evt => {
+					if (evt.detail.target?.id === 'goals-page-content') {
+						const dialog = document.getElementById('create-goal-dialog');
+						dialog?.querySelector('form')?.reset();
+						window.tui?.dialog?.close('create-goal-dialog');
+					}
+				});
+
+				// Focus title input when create dialog opens
+				document.addEventListener('click', e => {
+					if (e.target.closest('[data-tui-dialog-trigger][data-dialog-instance="create-goal-dialog"]')) {
+						setTimeout(() => document.getElementById('title')?.focus(), 150);
+					}
+				});
+			</script>
+		</div>
+	}
+}
+
+templ GoalsContent(goals []*model.Goal, sortBy string) {
+	{{ subscription := ctxkeys.Subscription(ctx) }}
+	{{ goalCount := len(goals) }}
+	{{ goalLimit := subscription.GetGoalLimit() }}
+	{{ canCreate := goalLimit == -1 || goalCount < goalLimit }}
+	<div id="goals-page-content">
+		<div class="mb-8 flex items-center justify-between">
+			<div>
+				if goalCount > 0 && subscription.HasFeature(model.FeatureExport) {
+					<a href="/app/goals/export" download="goals-export.json">
+						@button.Button(button.Props{Variant: button.VariantOutline}) {
+							Export Goals
+						}
+					</a>
+				} else if goalCount > 0 {
+					<a href="/app/billing">
+						@button.Button(button.Props{Variant: button.VariantOutline}) {
+							Export
+							@badge.Badge(badge.Props{Variant: badge.VariantSecondary, Class: "ml-2"}) {
+								Pro
+							}
+						}
+					</a>
+				}
+			</div>
+			if canCreate {
+				@dialog.Trigger(dialog.TriggerProps{For: "create-goal-dialog"}) {
+					@button.Button() {
+						Start New Goal
+					}
+				}
+			} else {
+				<a href="/app/billing">
+					@button.Button() {
+						Upgrade to Pro
+					}
+				</a>
+			}
+		</div>
+		<!-- Plan limit warning -->
+		if goalLimit != -1 && goalCount >= goalLimit {
+			@alert.Alert(alert.Props{Class: "mb-6"}) {
+				@alert.Title() {
+					if goalCount > goalLimit {
+						Over Plan Limit
+					} else {
+						Goal Limit Reached
+					}
+				}
+				@alert.Description() {
+					if goalCount > goalLimit {
+						<p>
+							You have { fmt.Sprintf("%d", goalCount) } active { pluralize("goal", goalCount) } on the { subscription.PlanID } plan (limit: { fmt.Sprintf("%d", goalLimit) }). Your existing goals remain accessible, but you need to
+							if subscription.PlanID == "free" {
+								<a href="/app/billing" class="underline font-medium ml-1">upgrade to Pro</a>
+								<span class="ml-1">to create new ones.</span>
+							} else {
+								<a href="/app/billing" class="underline font-medium ml-1">upgrade to Pro</a>
+								<span class="ml-1">to create new ones.</span>
+							}
+						</p>
+					} else {
+						<p>
+							You've reached the maximum of { fmt.Sprintf("%d", goalLimit) } { pluralize("goal", goalLimit) } on the { subscription.PlanID } plan.
+							if subscription.PlanID == "free" {
+								<a href="/app/billing" class="underline font-medium ml-1">Upgrade to Pro</a>
+								<span class="ml-1">{ "for" } 25 goals.</span>
+							} else {
+								<a href="/app/billing" class="underline font-medium ml-1">Upgrade to Pro</a>
+								<span class="ml-1">{ "for" } unlimited goals.</span>
+							}
+						</p>
+					}
+				}
+			}
+		}
+		<!-- Sort Tabs -->
+		if goalCount > 0 {
+			<div class="mb-4">
+				@tabs.List() {
+					@tabs.Trigger(tabs.TriggerProps{
+						Value:    "recent",
+						IsActive: sortBy == "recent",
+						Attributes: templ.Attributes{
+							"hx-get":      "/app/goals?sort=recent",
+							"hx-target":   "#goals-page-content",
+							"hx-push-url": "true",
+						},
+					}) {
+						Recent
+					}
+					@tabs.Trigger(tabs.TriggerProps{
+						Value:    "progress",
+						IsActive: sortBy == "progress",
+						Attributes: templ.Attributes{
+							"hx-get":      "/app/goals?sort=progress",
+							"hx-target":   "#goals-page-content",
+							"hx-push-url": "true",
+						},
+					}) {
+						Progress
+					}
+					@tabs.Trigger(tabs.TriggerProps{
+						Value:    "title",
+						IsActive: sortBy == "title",
+						Attributes: templ.Attributes{
+							"hx-get":      "/app/goals?sort=title",
+							"hx-target":   "#goals-page-content",
+							"hx-push-url": "true",
+						},
+					}) {
+						Title
+					}
+				}
+			</div>
+		}
+		@GoalsList(goals)
+	</div>
+}
+
+templ GoalsList(goals []*model.Goal) {
+	<div>
+		if len(goals) == 0 {
+			@card.Card() {
+				@card.Content(card.ContentProps{Class: "text-center py-12"}) {
+					<p class="text-muted-foreground">No goals yet!</p>
+				}
+			}
+		} else {
+			<div class="flex flex-col gap-3">
+				for _, goal := range goals {
+					<a href={ templ.URL(fmt.Sprintf("/app/goals/%s", goal.ID)) }>
+						@card.Card() {
+							@card.Header() {
+								<div class="flex items-start justify-between">
+									<div class="flex-1">
+										@card.Title() {
+											{ goal.Title }
+										}
+										if goal.Status == model.GoalStatusActive {
+											@badge.Badge(badge.Props{Class: "mt-2"}) {
+												Active
+											}
+										} else {
+											@badge.Badge(badge.Props{Class: "mt-2 bg-blue-600 text-white"}) {
+												Completed
+											}
+										}
+									</div>
+								</div>
+							}
+							@card.Content() {
+								if goal.Description != "" {
+									<p class="text-sm text-muted-foreground line-clamp-3 mb-4">{ goal.Description }</p>
+								} else {
+									<p class="text-sm text-muted-foreground italic mb-4">No description</p>
+								}
+								<!-- Progress Bar -->
+								<div class="space-y-2">
+									<div class="flex items-center justify-between text-sm">
+										<span class="font-medium">Progress</span>
+										<span class="text-muted-foreground">{ fmt.Sprintf("%d/100", goal.CurrentStep) }</span>
+									</div>
+									@progress.Progress(progress.Props{
+										Value: goal.CurrentStep,
+										Max:   100,
+									})
+								</div>
+								<div class="mt-4 text-xs text-muted-foreground">
+									Updated { goal.UpdatedAt.Format("Jan 2, 2006") }
+								</div>
+							}
+						}
+					</a>
+				}
+			</div>
+		}
+	</div>
+}
+
+templ GoalsCreateDialog() {
+	@dialog.Content() {
+		@dialog.Header() {
+			@dialog.Title() {
+				Start New Goal
+			}
+		}
+		<form hx-post="/app/goals" hx-target="#goals-page-content" class="space-y-4">
+			@csrf.Token()
+			<div>
+				@label.Label(label.Props{For: "title"}) {
+					Goal Title
+				}
+				@input.Input(input.Props{
+					ID:          "title",
+					Name:        "title",
+					Type:        "text",
+					Placeholder: "e.g., Learn Spanish, Do 100 Pushups",
+				})
+			</div>
+			<div>
+				@label.Label(label.Props{For: "description"}) {
+					Description
+				}
+				@textarea.Textarea(textarea.Props{
+					ID:          "description",
+					Name:        "description",
+					Placeholder: "What do you want to achieve?",
+					Rows:        4,
+				})
+			</div>
+			<div class="flex justify-end gap-2">
+				@dialog.Close() {
+					@button.Button(button.Props{
+						Variant: button.VariantOutline,
+						Type:    "button",
+						Attributes: templ.Attributes{
+							"data-reset-form": "true",
+						},
+					}) {
+						Cancel
+					}
+				}
+				@button.Button(button.Props{Type: "submit"}) {
+					Start Goal
+				}
+			</div>
+		</form>
+	}
+}

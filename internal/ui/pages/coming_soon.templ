@@ -1,0 +1,38 @@
+package pages
+
+import (
+	"github.com/jkeddari/hypermetrics/internal/ui/components/icon"
+	"github.com/jkeddari/hypermetrics/internal/ui/layouts"
+)
+
+templ State004Icon() {
+	<div class="relative inline-flex">
+		<div class="absolute inset-0 bg-green-500/20 rounded-full"></div>
+		<div class="relative rounded-full bg-green-100 dark:bg-green-900/20 p-6">
+			@icon.Hourglass(icon.Props{
+				Size:  48,
+				Class: "text-green-600 dark:text-green-500",
+			})
+		</div>
+	</div>
+}
+
+templ State004Content() {
+	<div class="space-y-2">
+		<h2 class="text-2xl font-semibold tracking-tight">Comin soon!</h2>
+		<p class="text-muted-foreground">
+			This feature is actually under development.
+		</p>
+	</div>
+}
+
+templ ComigSoon(title string) {
+	@layouts.App(title) {
+		<div class="flex justify-center py-6">
+			<div class="py-10 text-center space-y-6 max-w-md">
+				@State004Icon()
+				@State004Content()
+			</div>
+		</div>
+	}
+}

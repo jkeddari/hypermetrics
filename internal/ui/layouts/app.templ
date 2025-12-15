@@ -1,0 +1,215 @@
+package layouts
+
+import (
+	"github.com/jkeddari/hypermetrics/internal/ctxkeys"
+	"github.com/jkeddari/hypermetrics/internal/model"
+	"github.com/jkeddari/hypermetrics/internal/ui/blocks"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/avatar"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/breadcrumb"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/csrf"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/dropdown"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/icon"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/sidebar"
+	"strings"
+)
+
+templ App(title string) {
+	{{ cfg := ctxkeys.Config(ctx) }}
+	@Base(SEOProps{
+		Title:       title,
+		Description: "Application Dashboard",
+		Path:        ctxkeys.URLPath(ctx),
+	}) {
+		@sidebar.Layout() {
+			@sidebar.Sidebar() {
+				@sidebar.Header() {
+					@sidebar.Menu() {
+						@sidebar.MenuItem() {
+							@sidebar.MenuButton(sidebar.MenuButtonProps{
+								Size: sidebar.MenuButtonSizeLg,
+								Href: "/app/dashboard",
+							}) {
+								@icon.LayoutDashboard()
+								<div class="flex flex-col">
+									<span class="text-sm font-bold">{ cfg.AppName }</span>
+									<span class="text-xs text-muted-foreground">Workspace</span>
+								</div>
+							}
+						}
+					}
+				}
+				@sidebar.Content() {
+					@sidebar.Group() {
+						@sidebar.GroupLabel() {
+							Overview
+						}
+						@sidebar.Menu() {
+							@sidebar.MenuItem() {
+								@sidebar.MenuButton(sidebar.MenuButtonProps{
+									Href:     "/app/dashboard",
+									IsActive: ctxkeys.URLPath(ctx) == "/app/dashboard",
+									Tooltip:  "Dashboard",
+								}) {
+									@icon.House(icon.Props{Class: "size-4"})
+									<span>Dashboard</span>
+								}
+							}
+							@sidebar.MenuItem() {
+								@sidebar.MenuButton(sidebar.MenuButtonProps{
+									Href:     "/app/leaderboard",
+									IsActive: ctxkeys.URLPath(ctx) == "/app/leaderboard",
+									Tooltip:  "Leaderboard",
+								}) {
+									@icon.FolderOpen(icon.Props{Class: "size-4"})
+									<span>Leaderboard</span>
+								}
+							}
+							@sidebar.MenuItem() {
+								@sidebar.MenuButton(sidebar.MenuButtonProps{
+									Href:     "/app/top-positions",
+									IsActive: ctxkeys.URLPath(ctx) == "/app/top-positions",
+									Tooltip:  "Top positions",
+								}) {
+									@icon.FolderOpen(icon.Props{Class: "size-4"})
+									<span>Top positions</span>
+								}
+							}
+						}
+					}
+				}
+				@sidebar.Footer() {
+					@sidebar.Menu() {
+						@sidebar.MenuItem() {
+							@sidebar.MenuButton(sidebar.MenuButtonProps{
+								Href: "/docs",
+								Size: sidebar.MenuButtonSizeSm,
+								Attributes: templ.Attributes{
+									"target": "_blank",
+									"rel":    "noopener noreferrer",
+								},
+							}) {
+								@icon.BookOpen(icon.Props{Class: "size-4"})
+								<span>Documentation</span>
+							}
+						}
+						@sidebar.MenuItem() {
+							@sidebar.MenuButton(sidebar.MenuButtonProps{
+								Href: "mailto:" + cfg.SupportEmail,
+								Size: sidebar.MenuButtonSizeSm,
+							}) {
+								@icon.MessageCircleQuestionMark(icon.Props{Class: "size-4"})
+								<span>Support</span>
+							}
+						}
+					}
+					@sidebar.Separator()
+					@sidebar.Menu() {
+						@sidebar.MenuItem() {
+							{{ user := ctxkeys.User(ctx) }}
+							{{ profile := ctxkeys.Profile(ctx) }}
+							if user != nil && profile != nil {
+								@AppSidebarDropdown(user, profile)
+							}
+						}
+					}
+				}
+			}
+			@sidebar.Inset() {
+				// Top Navigation Bar
+				<header class="sticky top-0 z-10 border-b bg-background">
+					<div class="flex h-14 items-center px-6">
+						<div class="flex items-center gap-4">
+							@sidebar.Trigger()
+							@breadcrumb.Breadcrumb() {
+								@breadcrumb.List() {
+									@breadcrumb.Item() {
+										@breadcrumb.Page() {
+											{ title }
+										}
+									}
+								}
+							}
+						</div>
+						<div class="ml-auto flex items-center gap-4">
+							@blocks.ThemeSwitcher()
+						</div>
+					</div>
+				</header>
+				// App Content
+				<main class="flex-1">
+					{ children... }
+				</main>
+			}
+		}
+	}
+}
+
+templ AppSidebarDropdown(user *model.User, profile *model.Profile) {
+	@dropdown.Dropdown() {
+		@dropdown.Trigger() {
+			@sidebar.MenuButton(sidebar.MenuButtonProps{
+				Size: sidebar.MenuButtonSizeLg,
+			}) {
+				<div id="sidebar-avatar" hx-swap-oob="true">
+					@avatar.Avatar(avatar.Props{Class: "size-8 rounded-lg"}) {
+						if user.AvatarURL != "" {
+							@avatar.Image(avatar.ImageProps{Src: user.AvatarURL, Alt: profile.Name})
+						}
+						@avatar.Fallback() {
+							{ strings.ToUpper(string(profile.Name[0])) }
+						}
+					}
+				</div>
+				<div id="sidebar-user-name" hx-swap-oob="true" class="grid flex-1 text-left text-sm leading-tight">
+					<span class="truncate font-medium">{ profile.Name }</span>
+					<span class="truncate text-xs text-muted-foreground">{ user.Email }</span>
+				</div>
+				@icon.ChevronsUpDown(icon.Props{Class: "ml-auto size-4"})
+			}
+		}
+		@dropdown.Content(dropdown.ContentProps{
+			Class:     "w-56",
+			Placement: dropdown.PlacementTopStart,
+		}) {
+			<div id="dropdown-user-label" hx-swap-oob="true">
+				@dropdown.Label() {
+					<div class="flex flex-col">
+						<span class="font-medium">{ profile.Name }</span>
+						<span class="text-xs text-muted-foreground">{ user.Email }</span>
+					</div>
+				}
+			</div>
+			@dropdown.Separator()
+			@dropdown.Item(dropdown.ItemProps{
+				Href: "/app/settings",
+			}) {
+				<span class="flex items-center">
+					@icon.Settings(icon.Props{Size: 16, Class: "mr-2"})
+					Settings
+				</span>
+			}
+			@dropdown.Item(dropdown.ItemProps{
+				Href: "/app/billing",
+			}) {
+				<span class="flex items-center">
+					@icon.CreditCard(icon.Props{Size: 16, Class: "mr-2"})
+					Billing
+				</span>
+			}
+			@dropdown.Separator()
+			<form action="/auth/logout" method="POST" class="contents">
+				@csrf.Token()
+				@dropdown.Item(dropdown.ItemProps{
+					Attributes: templ.Attributes{
+						"type": "submit",
+					},
+				}) {
+					<span class="flex items-center">
+						@icon.LogOut(icon.Props{Size: 16, Class: "mr-2"})
+						Log out
+					</span>
+				}
+			</form>
+		}
+	}
+}

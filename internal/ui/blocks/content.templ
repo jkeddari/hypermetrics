@@ -1,0 +1,22 @@
+package blocks
+
+// ContentWithProse uses the Tailwind Typography plugin for styling
+// Requires: @plugin "@tailwindcss/typography" in input.css
+templ ContentWithProse(htmlContent string) {
+	<div
+		class={
+			templ.Classes(
+				"prose prose-neutral dark:prose-invert max-w-none",
+				// Inline code styling (not inside pre)
+				"prose-code:px-[0.3rem] prose-code:py-[0.2rem] prose-code:rounded-sm prose-code:text-sm prose-code:before:content-none prose-code:after:content-none",
+				"prose-code:bg-[#FAFAFA] prose-code:text-[#383A42] dark:prose-code:bg-[#282C34] dark:prose-code:text-[#ABB2BF]",
+				// Pre blocks - no padding, background color extends to edges, relative for button
+				"prose-pre:p-0 prose-pre:bg-[#FAFAFA] dark:prose-pre:bg-[#282C34] prose-pre:relative prose-pre:overflow-x-auto",
+				// Code inside pre - has the padding, transparent background, display block
+				"prose-pre>code:py-3 prose-pre>code:px-4 prose-pre>code:bg-transparent prose-pre>code:block",
+			),
+		}
+	>
+		@templ.Raw(htmlContent)
+	</div>
+}

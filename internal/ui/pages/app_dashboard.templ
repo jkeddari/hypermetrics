@@ -1,0 +1,71 @@
+package pages
+
+import (
+	"fmt"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/button"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/card"
+	"github.com/jkeddari/hypermetrics/internal/ui/layouts"
+)
+
+templ Dashboard() {
+	@layouts.App("Dashboard") {
+		<div class="container max-w-7xl px-6 py-8">
+			<div class="mb-8">
+				<h1 class="text-3xl font-bold">Dashboard</h1>
+				<p class="text-muted-foreground mt-2">Welcome to your dashboard</p>
+			</div>
+			<!-- Stats Grid -->
+			<div class="grid gap-4 md:grid-cols-3 mb-8">
+				<!-- Total Goals -->
+				@card.Card() {
+					@card.Header() {
+						@card.Title(card.TitleProps{Class: "text-sm font-medium"}) {
+							Total open interest
+						}
+					}
+					@card.Content() {
+						<div class="text-2xl font-bold">{ fmt.Sprintf("%d", 0) }</div>
+					}
+				}
+				<!-- Active Goals -->
+				@card.Card() {
+					@card.Header() {
+						@card.Title(card.TitleProps{Class: "text-sm font-medium"}) {
+							Daily volumes
+						}
+					}
+					@card.Content() {
+						<div class="text-2xl font-bold text-green-600">{ fmt.Sprintf("%d", 0) }</div>
+					}
+				}
+				<!-- Completed Goals -->
+				@card.Card() {
+					@card.Header() {
+						@card.Title(card.TitleProps{Class: "text-sm font-medium"}) {
+							Funding
+						}
+					}
+					@card.Content() {
+						<div class="text-2xl font-bold text-blue-600">{ fmt.Sprintf("%d", 0) }</div>
+					}
+				}
+			</div>
+			<!-- Top symbols -->
+			<div>
+				<div class="flex items-center justify-between mb-4">
+					<h2 class="text-xl font-semibold">Top symbols</h2>
+					<a href="/app/symbols">
+						@button.Button(button.Props{Variant: button.VariantOutline, Size: button.SizeSm}) {
+							View All
+						}
+					</a>
+				</div>
+				@card.Card() {
+					@card.Content(card.ContentProps{Class: "text-center py-8"}) {
+						<p class="text-muted-foreground mb-4">Coming soon...</p>
+					}
+				}
+			</div>
+		</div>
+	}
+}

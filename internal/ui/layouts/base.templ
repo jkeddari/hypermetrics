@@ -1,0 +1,171 @@
+package layouts
+
+import "github.com/jkeddari/hypermetrics/internal/ui/components/input"
+import "github.com/jkeddari/hypermetrics/internal/ui/components/dialog"
+import "github.com/jkeddari/hypermetrics/internal/ui/components/sidebar"
+import "github.com/jkeddari/hypermetrics/internal/ui/components/collapsible"
+import "github.com/jkeddari/hypermetrics/internal/ctxkeys"
+import "github.com/jkeddari/hypermetrics/internal/ui/components/dropdown"
+import "github.com/jkeddari/hypermetrics/internal/ui/components/popover"
+import "github.com/jkeddari/hypermetrics/internal/ui/components/toast"
+import "github.com/jkeddari/hypermetrics/internal/ui/components/calendar"
+import "github.com/jkeddari/hypermetrics/internal/ui/components/datepicker"
+import "github.com/jkeddari/hypermetrics/internal/ui/components/progress"
+import "fmt"
+import "time"
+
+type SEOProps struct {
+	Title       string
+	Description string
+	Path        string
+}
+
+templ Base(props ...SEOProps) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<meta name="csrf-token" content={ ctxkeys.CSRFToken(ctx) }/>
+			if len(props) > 0 {
+				@seo(props[0])
+			} else {
+				{{ cfg := ctxkeys.Config(ctx) }}
+				<title>{ cfg.AppName }</title>
+			}
+			<link rel="icon" type="image/x-icon" href="/assets/favicon/favicon.ico"/>
+			<link href={ "/assets/css/output.css?v=" + templ.EscapeString(fmt.Sprintf("%d", time.Now().Unix())) } rel="stylesheet"/>
+			<script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.7/dist/htmx.min.js" integrity="sha384-ZBXiYtYQ6hJ2Y0ZNoYuI+Nq5MqWBr+chMrS/RkXpNzQCApHEhOt2aY8EJgqwHLkJ" crossorigin="anonymous"></script>
+			// Component scripts
+			@input.Script()
+			@sidebar.Script()
+			@dialog.Script()
+			@collapsible.Script()
+			@dropdown.Script()
+			@popover.Script()
+			@toast.Script()
+			@calendar.Script()
+			@datepicker.Script()
+			@progress.Script()
+			// Site-wide enhancements
+			@themeScript()
+			// Must run before body to prevent flash
+			@smoothScrollScript()
+			// HTMX CSRF configuration
+			@htmxCSRFScript()
+			// Analytics
+			@Analytics()
+		</head>
+		<body class="min-h-screen">
+			{ children... }
+			// Global Toast Container
+			<div id="toast-container"></div>
+			// Built with goilerplate Badge
+			<a
+				href="https://goilerplate.com?atp=jordxdev"
+				target="_blank"
+				rel="noopener"
+				class="fixed bottom-4 right-4 z-40 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground border border-border rounded-full bg-background/80 backdrop-blur-sm transition-all hover:scale-105 hover:shadow-md flex items-center gap-2"
+			>
+				<span class="w-2 h-2 rounded-full bg-foreground animate-pulse"></span>
+				Built with goilerplate
+			</a>
+		</body>
+	</html>
+}
+
+templ seo(props SEOProps) {
+	{{ cfg := ctxkeys.Config(ctx) }}
+	{{ baseURL := cfg.AppURL }}
+	{{ appName := cfg.AppName }}
+	{{ appTagline := cfg.AppTagline }}
+	{{ fullTitle := props.Title + " - " + appName }}
+	@templ.Fragment("seo-title") {
+		<title id="page-title" hx-swap-oob="true">{ fullTitle }</title>
+	}
+	<meta name="description" content={ props.Description }/>
+	// Author
+	<meta name="author" content={ appName }/>
+	// Robots Tags
+	<meta name="robots" content="index, follow"/>
+	// Canonical URL
+	<link rel="canonical" href={ baseURL + props.Path }/>
+	// OpenGraph Tags
+	<meta property="og:title" content={ fullTitle }/>
+	<meta property="og:description" content={ props.Description }/>
+	<meta property="og:type" content="website"/>
+	<meta property="og:url" content={ baseURL + props.Path }/>
+	<meta property="og:site_name" content={ appName }/>
+	// OpenGraph Image
+	<meta property="og:image" content={ baseURL + "/assets/img/social-preview.png" }/>
+	<meta property="og:image:width" content="1200"/>
+	<meta property="og:image:height" content="630"/>
+	<meta property="og:image:alt" content={ appName + " - " + appTagline }/>
+	// Twitter Card
+	<meta name="twitter:card" content="summary_large_image"/>
+	<meta name="twitter:title" content={ fullTitle }/>
+	<meta name="twitter:description" content={ props.Description }/>
+	<meta name="twitter:image" content={ baseURL + "/assets/img/social-preview.png" }/>
+	<meta name="twitter:image:alt" content={ appName + " - " + appTagline }/>
+	// Theme Color
+	<meta name="theme-color" content="#000000"/>
+}
+
+templ themeScript() {
+	<script nonce={ templ.GetNonce(ctx) }>
+		// Apply saved theme or system preference on load
+		if (localStorage.theme === 'dark' || (!localStorage.theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+			document.documentElement.classList.add('dark');
+		}
+		
+		// Theme toggle handler
+		document.addEventListener('click', (e) => {
+			if (e.target.closest('[data-theme-switcher]')) {
+				e.preventDefault();
+				const isDark = document.documentElement.classList.toggle('dark');
+				localStorage.theme = isDark ? 'dark' : 'light';
+			}
+		});
+	</script>
+}
+
+templ smoothScrollScript() {
+	// Smooth scrolling for anchor links - works site-wide
+	<script nonce={ templ.GetNonce(ctx) }>
+		document.addEventListener('DOMContentLoaded', function() {
+			document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+				anchor.addEventListener('click', function (e) {
+					// Only prevent default for same-page anchors
+					const href = this.getAttribute('href');
+					if (href && href !== '#' && href.startsWith('#')) {
+						const target = document.querySelector(href);
+						if (target) {
+							e.preventDefault();
+							target.scrollIntoView({
+								behavior: 'smooth',
+								block: 'start'
+							});
+						}
+					}
+				});
+			});
+		});
+	</script>
+}
+
+templ htmxCSRFScript() {
+	// Configure HTMX to automatically send CSRF token with all requests
+	<script nonce={ templ.GetNonce(ctx) }>
+		document.addEventListener('DOMContentLoaded', function() {
+			// Listen for htmx requests and add CSRF token header
+			document.body.addEventListener('htmx:configRequest', function(event) {
+				// Get CSRF token from meta tag
+				const meta = document.querySelector('meta[name="csrf-token"]');
+				if (meta) {
+					// Add token as X-CSRF-Token header to all HTMX requests
+					event.detail.headers['X-CSRF-Token'] = meta.getAttribute('content');
+				}
+			});
+		});
+	</script>
+}

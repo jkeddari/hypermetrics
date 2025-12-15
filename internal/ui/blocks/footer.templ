@@ -1,0 +1,203 @@
+package blocks
+
+import (
+	"github.com/jkeddari/hypermetrics/internal/ctxkeys"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/alert"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/button"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/csrf"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/form"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/icon"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/input"
+	"github.com/jkeddari/hypermetrics/internal/ui/icons"
+)
+
+templ Footer() {
+	<footer class="border-t bg-background">
+		@FooterContent()
+		@FooterNewsletterForm("")
+		@FooterBottom()
+	</footer>
+}
+
+templ FooterContent() {
+	{{ cfg := ctxkeys.Config(ctx) }}
+	<div class="container mx-auto px-4 py-12">
+		<div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+			<!-- Company Info -->
+			<div>
+				<h3 class="font-semibold text-foreground mb-4">{ cfg.AppName }</h3>
+				<p class="text-sm text-muted-foreground mb-2">
+					{ cfg.AppTagline }
+				</p>
+				<a href={ "mailto:" + cfg.SupportEmail } class="text-sm text-muted-foreground hover:text-foreground transition-colors">
+					{ cfg.SupportEmail }
+				</a>
+				<!-- Social Links -->
+				<div class="flex space-x-4 mt-4">
+					<a href="https://github.com" target="_blank" rel="noopener noreferrer" class="text-muted-foreground hover:text-foreground transition-colors">
+						@icons.Github(icons.Props{Size: 20})
+					</a>
+					<a href="https://x.com" target="_blank" rel="noopener noreferrer" class="text-muted-foreground hover:text-foreground transition-colors">
+						@icons.X(icons.Props{Size: 20})
+					</a>
+					<a href="https://discord.com" target="_blank" rel="noopener noreferrer" class="text-muted-foreground hover:text-foreground transition-colors">
+						@icons.Discord(icons.Props{Size: 20})
+					</a>
+				</div>
+			</div>
+			<!-- Product -->
+			<div>
+				<h3 class="font-semibold text-foreground mb-4">Product</h3>
+				<ul class="space-y-2">
+					<li>
+						<a href="/#features" class="text-sm text-muted-foreground hover:text-foreground transition-colors">
+							Features
+						</a>
+					</li>
+					<li>
+						<a href="/#pricing" class="text-sm text-muted-foreground hover:text-foreground transition-colors">
+							Pricing
+						</a>
+					</li>
+					<li>
+						<a href="/#faq" class="text-sm text-muted-foreground hover:text-foreground transition-colors">
+							FAQ
+						</a>
+					</li>
+					<li>
+						<a href="/docs" class="text-sm text-muted-foreground hover:text-foreground transition-colors">
+							Documentation
+						</a>
+					</li>
+				</ul>
+			</div>
+			<!-- Resources -->
+			<div>
+				<h3 class="font-semibold text-foreground mb-4">Resources</h3>
+				<ul class="space-y-2">
+					<li>
+						<a href="/docs/introduction" class="text-sm text-muted-foreground hover:text-foreground transition-colors">
+							Introduction
+						</a>
+					</li>
+					<li>
+						<a href="/docs/getting-started" class="text-sm text-muted-foreground hover:text-foreground transition-colors">
+							Getting Started
+						</a>
+					</li>
+					<li>
+						<a href="/docs/features" class="text-sm text-muted-foreground hover:text-foreground transition-colors">
+							Features
+						</a>
+					</li>
+					<li>
+						<a href="/docs/guides" class="text-sm text-muted-foreground hover:text-foreground transition-colors">
+							Guides
+						</a>
+					</li>
+				</ul>
+			</div>
+			<!-- Legal -->
+			<div>
+				<h3 class="font-semibold text-foreground mb-4">Legal</h3>
+				<ul class="space-y-2">
+					<li>
+						<a href="/legal/terms" class="text-sm text-muted-foreground hover:text-foreground transition-colors">
+							Terms of Service
+						</a>
+					</li>
+					<li>
+						<a href="/legal/privacy" class="text-sm text-muted-foreground hover:text-foreground transition-colors">
+							Privacy Policy
+						</a>
+					</li>
+					<li>
+						<a href="/legal/cookies" class="text-sm text-muted-foreground hover:text-foreground transition-colors">
+							Cookie Policy
+						</a>
+					</li>
+				</ul>
+			</div>
+		</div>
+	</div>
+}
+
+templ FooterNewsletterSection() {
+	<div class="border-t border-b" id="newsletter-section">
+		<div class="container mx-auto px-4 py-12">
+			<div class="mx-auto max-w-md text-center">
+				<h3 class="text-2xl font-bold">Stay Updated</h3>
+				<p class="mt-2 text-muted-foreground">
+					Get the latest updates on new features and components.
+				</p>
+				{ children... }
+				<p class="mt-3 text-xs text-muted-foreground">
+					No spam, ever. Unsubscribe anytime.
+				</p>
+			</div>
+		</div>
+	</div>
+}
+
+templ FooterNewsletterForm(errorMsg string) {
+	@FooterNewsletterSection() {
+		<form
+			class="mt-6 flex flex-col sm:flex-row gap-3 items-start"
+			hx-post="/newsletter/subscribe"
+			hx-trigger="submit"
+			hx-target="#newsletter-section"
+			hx-swap="outerHTML"
+		>
+			@csrf.Token()
+			@form.Item(form.ItemProps{Class: "flex-1 text-left"}) {
+				@input.Input(input.Props{
+					ID:          "footer-newsletter",
+					Name:        "email",
+					Type:        input.TypeEmail,
+					Placeholder: "your@email.com",
+					HasError:    errorMsg != "",
+				})
+				if errorMsg != "" {
+					@form.Message(form.MessageProps{Variant: form.MessageVariantError}) {
+						{ errorMsg }
+					}
+				}
+			}
+			@button.Button(button.Props{
+				Type: button.TypeSubmit,
+			}) {
+				if errorMsg != "" {
+					Try Again
+				} else {
+					Subscribe
+				}
+			}
+		</form>
+	}
+}
+
+// Component to show after successful newsletter signup
+templ FooterNewsletterSuccess() {
+	@FooterNewsletterSection() {
+		<div class="mt-6 text-left">
+			@alert.Alert() {
+				@icon.CircleCheck()
+				@alert.Title() {
+					Success
+				}
+				@alert.Description() {
+					<p>Thank you for subscribing.</p>
+				}
+			}
+		</div>
+	}
+}
+
+templ FooterBottom() {
+	{{ cfg := ctxkeys.Config(ctx) }}
+	<div class="container mx-auto px-4 py-6">
+		<div class="text-center text-sm text-muted-foreground">
+			© 2024 { cfg.AppName }. All rights reserved.
+		</div>
+	</div>
+}

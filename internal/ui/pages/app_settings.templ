@@ -1,0 +1,532 @@
+package pages
+
+import (
+	"github.com/jkeddari/hypermetrics/internal/ctxkeys"
+	"github.com/jkeddari/hypermetrics/internal/model"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/avatar"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/button"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/card"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/csrf"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/dialog"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/icon"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/input"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/label"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/tabs"
+	"github.com/jkeddari/hypermetrics/internal/ui/layouts"
+	"strings"
+)
+
+templ Settings() {
+	{{ profile := ctxkeys.Profile(ctx) }}
+	{{ user := ctxkeys.User(ctx) }}
+	@layouts.App("Settings") {
+		<div class="container max-w-4xl px-6 py-8">
+			<div class="mb-8">
+				<h1 class="text-3xl font-bold">Settings</h1>
+				<p class="text-muted-foreground mt-2">Manage your account settings</p>
+			</div>
+			@tabs.Tabs() {
+				@tabs.List() {
+					@tabs.Trigger(tabs.TriggerProps{Value: "profile", IsActive: true}) {
+						@icon.User(icon.Props{Size: 16})
+						Profile
+					}
+					@tabs.Trigger(tabs.TriggerProps{Value: "security"}) {
+						@icon.Shield(icon.Props{Size: 16})
+						Security
+					}
+				}
+				@tabs.Content(tabs.ContentProps{Value: "profile", IsActive: true}) {
+					<div class="space-y-6 mt-6">
+						@SettingsNameSection(profile)
+						@SettingsAvatarSection(user)
+					</div>
+				}
+				@tabs.Content(tabs.ContentProps{Value: "security"}) {
+					<div class="space-y-6 mt-6">
+						@SettingsEmailSection(user)
+						@SettingsPasswordSection()
+						@SettingsDangerZoneSection()
+					</div>
+				}
+			}
+			@tabs.Script()
+		</div>
+	}
+}
+
+templ SettingsNameSection(profile *model.Profile) {
+	@card.Card() {
+		@card.Header() {
+			@card.Title() {
+				Name
+			}
+			@card.Description() {
+				Update your display name
+			}
+		}
+		@card.Content() {
+			<form
+				hx-patch="/app/profile/name"
+				hx-swap="none"
+				class="space-y-4"
+			>
+				@csrf.Token()
+				<div class="space-y-2">
+					@label.Label(label.Props{For: "name"}) {
+						Name
+					}
+					@input.Input(input.Props{
+						Type:        "text",
+						ID:          "name",
+						Name:        "name",
+						Value:       profile.Name,
+						Placeholder: "Your name",
+					})
+				</div>
+				<div class="flex justify-end">
+					@button.Button(button.Props{
+						Type: "submit",
+					}) {
+						Save Name
+					}
+				</div>
+			</form>
+		}
+	}
+}
+
+templ SettingsAvatarSection(user *model.User) {
+	@card.Card() {
+		@card.Header() {
+			@card.Title() {
+				Avatar
+			}
+			@card.Description() {
+				Upload a profile picture (Max 5MB, JPG/PNG/WebP)
+			}
+		}
+		@card.Content() {
+			<div class="flex flex-col md:flex-row items-start gap-4 md:gap-6">
+				@templ.Fragment("settings-avatar-display") {
+					<div id="settings-avatar" hx-swap-oob="true">
+						@avatar.Avatar(avatar.Props{Class: "size-20"}) {
+							if user.AvatarURL != "" {
+								@avatar.Image(avatar.ImageProps{Src: user.AvatarURL, Alt: user.Email})
+							}
+							@avatar.Fallback() {
+								{ strings.ToUpper(string(user.Email[0])) }
+							}
+						}
+					</div>
+				}
+				<div class="flex-1 w-full space-y-4">
+					@templ.Fragment("settings-avatar-form") {
+						<form
+							id="avatar-upload-form"
+							hx-swap-oob="true"
+							hx-post="/app/account/avatar"
+							hx-encoding="multipart/form-data"
+							hx-swap="none"
+							class="space-y-4"
+						>
+							@csrf.Token()
+							<div class="space-y-2">
+								@label.Label(label.Props{For: "avatar"}) {
+									Choose Image
+								}
+								@input.Input(input.Props{
+									Type: "file",
+									ID:   "avatar",
+									Name: "avatar",
+									Attributes: templ.Attributes{
+										"accept": "image/jpeg,image/jpg,image/png,image/webp",
+									},
+								})
+								<p class="text-sm text-muted-foreground">
+									JPEG, PNG or WebP. Max file size 5MB.
+								</p>
+							</div>
+							<div class="flex flex-col sm:flex-row sm:justify-end gap-2">
+								@button.Button(button.Props{
+									Type:  "submit",
+									Class: "w-full sm:w-auto",
+								}) {
+									@icon.Upload(icon.Props{Size: 16, Class: "mr-2"})
+									Upload Avatar
+								}
+								@dialog.Dialog(dialog.Props{ID: "delete-avatar-dialog"}) {
+									@dialog.Trigger() {
+										@button.Button(button.Props{
+											Type:    "button",
+											Variant: button.VariantOutline,
+											Class:   "w-full sm:w-auto",
+										}) {
+											@icon.Trash2(icon.Props{Size: 16, Class: "mr-2"})
+											Remove Avatar
+										}
+									}
+									@dialog.Content() {
+										@dialog.Header() {
+											@dialog.Title() {
+												Remove Avatar
+											}
+											@dialog.Description() {
+												Are you sure you want to remove your avatar? This action cannot be undone.
+											}
+										}
+										@dialog.Footer() {
+											@dialog.Close() {
+												@button.Button(button.Props{
+													Variant: button.VariantOutline,
+												}) {
+													Cancel
+												}
+											}
+											@dialog.Close() {
+												@button.Button(button.Props{
+													Attributes: templ.Attributes{
+														"hx-delete": "/app/account/avatar",
+														"hx-swap":   "none",
+													},
+												}) {
+													Remove
+												}
+											}
+										}
+									}
+								}
+							</div>
+						</form>
+					}
+				</div>
+			</div>
+		}
+	}
+}
+
+templ SettingsEmailSection(user *model.User) {
+	@card.Card() {
+		@card.Header() {
+			@card.Title() {
+				Email Address
+			}
+			@card.Description() {
+				Update your email address
+			}
+		}
+		@card.Content() {
+			<form
+				hx-patch="/app/account/email"
+				hx-swap="none"
+				class="space-y-4"
+			>
+				@csrf.Token()
+				<div class="space-y-2">
+					@label.Label(label.Props{For: "email"}) {
+						Email
+					}
+					@input.Input(input.Props{
+						Type:        "email",
+						ID:          "email",
+						Name:        "email",
+						Value:       user.Email,
+						Placeholder: "your@email.com",
+					})
+				</div>
+				<div class="flex justify-end">
+					@button.Button(button.Props{
+						Type: "submit",
+					}) {
+						Update Email
+					}
+				</div>
+			</form>
+		}
+	}
+}
+
+templ SettingsPasswordSection() {
+	{{ user := ctxkeys.User(ctx) }}
+	@card.Card() {
+		@card.Header() {
+			@card.Title() {
+				Password
+			}
+			if user.HasPassword() {
+				@card.Description() {
+					You can sign in with your password or magic links
+				}
+			} else {
+				@card.Description() {
+					You're using passwordless login (magic links only)
+				}
+			}
+		}
+		@card.Content() {
+			@templ.Fragment("settings-password-form") {
+				<div id="password-form" hx-swap-oob="true" class="space-y-4">
+					if user.HasPassword() {
+						<!-- Change Password Form -->
+						<form
+							hx-post="/app/account/password"
+							hx-swap="none"
+							class="space-y-4"
+						>
+							@csrf.Token()
+							<div class="space-y-2">
+								@label.Label(label.Props{For: "current_password"}) {
+									Current Password
+								}
+								@input.Input(input.Props{
+									Type:        "password",
+									ID:          "current_password",
+									Name:        "current_password",
+									Placeholder: "Enter current password",
+								})
+							</div>
+							<div class="space-y-2">
+								@label.Label(label.Props{For: "new_password"}) {
+									New Password
+								}
+								@input.Input(input.Props{
+									Type:        "password",
+									ID:          "new_password",
+									Name:        "new_password",
+									Placeholder: "Enter new password",
+								})
+								<p class="text-sm text-muted-foreground">
+									Must be at least 12 characters long
+								</p>
+							</div>
+							<div class="space-y-2">
+								@label.Label(label.Props{For: "confirm_password"}) {
+									Confirm New Password
+								}
+								@input.Input(input.Props{
+									Type:        "password",
+									ID:          "confirm_password",
+									Name:        "confirm_password",
+									Placeholder: "Confirm new password",
+								})
+							</div>
+							<div class="flex justify-between items-center">
+								@dialog.Dialog(dialog.Props{ID: "remove-password-dialog"}) {
+									@dialog.Trigger() {
+										@button.Button(button.Props{
+											Type:    "button",
+											Variant: button.VariantOutline,
+										}) {
+											Remove Password
+										}
+									}
+									@dialog.Content() {
+										@dialog.Header() {
+											@dialog.Title() {
+												Remove Password
+											}
+											@dialog.Description() {
+												Are you sure? You'll only be able to sign in with magic links.
+											}
+										}
+										@dialog.Footer() {
+											@dialog.Close() {
+												@button.Button(button.Props{
+													Variant: button.VariantOutline,
+												}) {
+													Cancel
+												}
+											}
+											@dialog.Close() {
+												@button.Button(button.Props{
+													Attributes: templ.Attributes{
+														"hx-delete": "/app/account/password",
+														"hx-swap":   "none",
+													},
+												}) {
+													Remove Password
+												}
+											}
+										}
+									}
+								}
+								@button.Button(button.Props{
+									Type: "submit",
+								}) {
+									Update Password
+								}
+							</div>
+						</form>
+					} else {
+						<!-- Set Password Form -->
+						<div class="space-y-4">
+							<div class="rounded-lg border bg-muted/50 p-4">
+								<p class="text-sm text-muted-foreground">
+									Set a password to enable password-based sign in. You can still use magic links anytime.
+								</p>
+							</div>
+							<form
+								hx-post="/app/account/password/set"
+								hx-swap="none"
+								class="space-y-4"
+							>
+								@csrf.Token()
+								<div class="space-y-2">
+									@label.Label(label.Props{For: "new_password"}) {
+										New Password
+									}
+									@input.Input(input.Props{
+										Type:        "password",
+										ID:          "new_password",
+										Name:        "new_password",
+										Placeholder: "Enter new password",
+									})
+									<p class="text-sm text-muted-foreground">
+										Must be at least 12 characters long
+									</p>
+								</div>
+								<div class="space-y-2">
+									@label.Label(label.Props{For: "confirm_password"}) {
+										Confirm Password
+									}
+									@input.Input(input.Props{
+										Type:        "password",
+										ID:          "confirm_password",
+										Name:        "confirm_password",
+										Placeholder: "Confirm new password",
+									})
+								</div>
+								<div class="flex justify-end">
+									@button.Button(button.Props{
+										Type: "submit",
+									}) {
+										Set Password
+									}
+								</div>
+							</form>
+						</div>
+					}
+				</div>
+			}
+		}
+	}
+}
+
+templ SettingsDangerZoneSection() {
+	@card.Card() {
+		@card.Header() {
+			@card.Title() {
+				Danger Zone
+			}
+			@card.Description() {
+				Permanently delete your account and all associated data
+			}
+		}
+		@card.Content() {
+			<div class="space-y-4">
+				<div class="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
+					<h3 class="font-semibold text-destructive mb-2">Delete Account</h3>
+					<p class="text-sm text-muted-foreground mb-4">
+						Once you delete your account, there is no going back. Please be certain.
+					</p>
+					@dialog.Dialog(dialog.Props{ID: "delete-account-dialog"}) {
+						@dialog.Trigger() {
+							@button.Button(button.Props{
+								Type:    "button",
+								Variant: button.VariantDestructive,
+							}) {
+								@icon.Trash2(icon.Props{Size: 16, Class: "mr-2"})
+								Delete Account
+							}
+						}
+						@dialog.Content() {
+							@dialog.Header() {
+								@dialog.Title() {
+									Delete Account
+								}
+								@dialog.Description() {
+									This will permanently delete your account and all associated data including your profile, files, and settings. This action cannot be undone.
+								}
+							}
+							<form
+								id="delete-account-form"
+								hx-delete="/app/account"
+								hx-swap="none"
+							>
+								@csrf.Token()
+								<div class="px-6 py-4 space-y-2">
+									@label.Label(label.Props{For: "delete-confirmation"}) {
+										Type <span class="font-mono font-semibold">DELETE</span> to confirm
+									}
+									@input.Input(input.Props{
+										Type:        "text",
+										ID:          "delete-confirmation",
+										Name:        "delete_confirmation",
+										Placeholder: "DELETE",
+										Attributes: templ.Attributes{
+											"autocomplete": "off",
+										},
+									})
+								</div>
+								@dialog.Footer() {
+									@dialog.Close() {
+										@button.Button(button.Props{
+											Type:    "button",
+											Variant: button.VariantOutline,
+										}) {
+											Cancel
+										}
+									}
+									@dialog.Close() {
+										@button.Button(button.Props{
+											Type:     "submit",
+											Disabled: true,
+											Attributes: templ.Attributes{
+												"data-delete-submit": "",
+											},
+										}) {
+											Yes, Delete My Account
+										}
+									}
+								}
+							</form>
+							<script nonce={ templ.GetNonce(ctx) }>
+								(function() {
+									const form = document.getElementById("delete-account-form");
+									const input = document.getElementById("delete-confirmation");
+									const button = document.querySelector("[data-delete-submit]");
+									const dialogContent = button.closest("[data-tui-dialog-content]");
+
+									if (!form || !input || !button || !dialogContent) return;
+
+									// Enable button when "DELETE" is typed
+									input.addEventListener("input", function() {
+										button.disabled = this.value !== "DELETE";
+									});
+
+									// Reset form when dialog closes (with delay to prevent flicker during close animation)
+									const observer = new MutationObserver(function(mutations) {
+										mutations.forEach(function(mutation) {
+											if (mutation.attributeName === "data-tui-dialog-open") {
+												const isOpen = dialogContent.getAttribute("data-tui-dialog-open") === "true";
+												if (!isOpen) {
+													// Wait for dialog close animation (200ms transition + 50ms buffer)
+													setTimeout(function() {
+														form.reset();
+														button.disabled = true;
+													}, 250);
+												}
+											}
+										});
+									});
+
+									observer.observe(dialogContent, { attributes: true });
+								})();
+							</script>
+						}
+					}
+				</div>
+			</div>
+		}
+	}
+}

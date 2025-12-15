@@ -1,0 +1,67 @@
+package pages
+
+import (
+	"github.com/jkeddari/hypermetrics/internal/ctxkeys"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/button"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/csrf"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/icon"
+	"github.com/jkeddari/hypermetrics/internal/ui/layouts"
+)
+
+templ MagicLinkSent(email string) {
+	@layouts.Auth(layouts.SEOProps{
+		Title:       "Check Your Email",
+		Description: "Magic link sent to your email",
+		Path:        ctxkeys.URLPath(ctx),
+	}) {
+		<div class="min-h-screen flex items-center justify-center p-4">
+			<div class="w-full max-w-sm">
+				<div class="text-center mb-8">
+					<div class="mb-8">
+						<div class="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+							@icon.Mail()
+						</div>
+					</div>
+					<h2 class="text-3xl font-bold">Check your email</h2>
+					<p class="text-muted-foreground mt-2">We've sent a magic link to</p>
+					<p class="font-medium mt-1">{ email }</p>
+				</div>
+				<div class="space-y-6">
+					<div class="rounded-lg bg-muted/50 p-4 text-sm text-muted-foreground space-y-2">
+						<p>Click the link in your email to sign in instantly.</p>
+						<p>The link will expire in 10 minutes and can only be used once.</p>
+					</div>
+					<div class="space-y-3">
+						<form
+							hx-post="/auth/magic-link?resend=true"
+							hx-swap="none"
+							hx-disabled-elt="find button"
+						>
+							@csrf.Token()
+							<input type="hidden" name="email" value={ email }/>
+							@button.Button(button.Props{
+								Variant:   button.VariantOutline,
+								FullWidth: true,
+								Type:      button.TypeSubmit,
+							}) {
+								Resend magic link
+							}
+						</form>
+						{{ cfg := ctxkeys.Config(ctx) }}
+						<p class="text-xs text-center text-muted-foreground">
+							Didn't receive it? Check your spam folder or
+							<a href={ templ.SafeURL("mailto:" + cfg.SupportEmail) } class="text-primary hover:underline">
+								contact support
+							</a>
+						</p>
+						<p class="text-center text-sm">
+							<a href="/auth" class="text-primary hover:underline">
+								Back to login
+							</a>
+						</p>
+					</div>
+				</div>
+			</div>
+		</div>
+	}
+}

@@ -1,0 +1,203 @@
+package blocks
+
+import (
+	"github.com/jkeddari/hypermetrics/internal/ctxkeys"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/button"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/csrf"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/icon"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/sheet"
+)
+
+templ Navbar() {
+	{{ cfg := ctxkeys.Config(ctx) }}
+	<nav class="sticky top-0 z-50 bg-background border-b">
+		<div class="container mx-auto px-4 py-4 flex justify-between items-center">
+			<!-- Left: Logo and Desktop Nav -->
+			<div class="flex items-center gap-6">
+				@button.Button(button.Props{
+					Href:    "/",
+					Variant: button.VariantGhost,
+					Size:    button.SizeSm,
+					Class:   "font-bold",
+				}) {
+					@icon.Layers()
+					{ cfg.AppName }
+				}
+				<!-- Desktop Navigation -->
+				<div class="hidden md:flex gap-2">
+					@button.Button(button.Props{
+						Href:    "#features",
+						Variant: button.VariantGhost,
+						Size:    button.SizeSm,
+					}) {
+						Features
+					}
+					@button.Button(button.Props{
+						Href:    "#pricing",
+						Variant: button.VariantGhost,
+						Size:    button.SizeSm,
+					}) {
+						Pricing
+					}
+					@button.Button(button.Props{
+						Href:    "#faq",
+						Variant: button.VariantGhost,
+						Size:    button.SizeSm,
+					}) {
+						FAQ
+					}
+					@button.Button(button.Props{
+						Href:    "/docs",
+						Variant: button.VariantGhost,
+						Size:    button.SizeSm,
+					}) {
+						Docs
+					}
+				</div>
+			</div>
+			<!-- Right: Desktop Actions and Mobile Menu -->
+			<div class="flex gap-2 items-center">
+				{{ user := ctxkeys.User(ctx) }}
+				if user != nil {
+					<!-- Logged in: Show Dashboard + User Info -->
+					<div class="hidden md:flex gap-2 items-center">
+						@button.Button(button.Props{
+							Href:    "/app/dashboard",
+							Variant: button.VariantGhost,
+							Size:    button.SizeSm,
+						}) {
+							@icon.LayoutDashboard(icon.Props{Size: 16})
+							Dashboard
+						}
+						<form action="/auth/logout" method="POST">
+							@csrf.Token()
+							@button.Button(button.Props{
+								Type:    "submit",
+								Variant: button.VariantOutline,
+								Size:    button.SizeSm,
+							}) {
+								Logout
+							}
+						</form>
+						@ThemeSwitcher()
+					</div>
+					<!-- Mobile: Dashboard Button -->
+					@button.Button(button.Props{
+						Href:  "/app/dashboard",
+						Size:  button.SizeSm,
+						Class: "md:hidden",
+					}) {
+						@icon.LayoutDashboard(icon.Props{Size: 16})
+						Dashboard
+					}
+				} else {
+					<!-- Not logged in: Show Get Started -->
+					<div class="hidden md:flex gap-2 items-center">
+						@button.Button(button.Props{
+							Href: "/auth",
+							Size: button.SizeSm,
+						}) {
+							Get Started
+						}
+						@ThemeSwitcher()
+					</div>
+					<!-- Mobile: Get Started + Menu -->
+					@button.Button(button.Props{
+						Href:  "/auth",
+						Size:  button.SizeSm,
+						Class: "md:hidden",
+					}) {
+						Get Started
+					}
+				}
+				<!-- Mobile Menu Sheet -->
+				@sheet.Sheet(sheet.Props{
+					ID:   "mobile-nav",
+					Side: sheet.SideRight,
+				}) {
+					@sheet.Trigger(sheet.TriggerProps{
+						Class: "md:hidden",
+					}) {
+						@button.Button(button.Props{
+							Variant: button.VariantGhost,
+							Size:    button.SizeSm,
+							Class:   "px-2",
+						}) {
+							@icon.Menu(icon.Props{Size: 20})
+						}
+					}
+					@sheet.Content(sheet.ContentProps{
+						Side: sheet.SideRight,
+					}) {
+						@MobileNav()
+					}
+				}
+			</div>
+		</div>
+	</nav>
+}
+
+templ MobileNav() {
+	<div class="flex flex-col h-full">
+		<!-- Navigation Links -->
+		<div class="flex-1 overflow-y-auto">
+			<div class="p-6 space-y-1">
+				@sheet.Close(sheet.CloseProps{
+					Class: "flex items-center px-3 py-2 rounded-md hover:bg-accent text-foreground w-full text-left",
+				}) {
+					<a href="#features" class="w-full">Features</a>
+				}
+				@sheet.Close(sheet.CloseProps{
+					Class: "flex items-center px-3 py-2 rounded-md hover:bg-accent text-foreground w-full text-left",
+				}) {
+					<a href="#pricing" class="w-full">Pricing</a>
+				}
+				@sheet.Close(sheet.CloseProps{
+					Class: "flex items-center px-3 py-2 rounded-md hover:bg-accent text-foreground w-full text-left",
+				}) {
+					<a href="#faq" class="w-full">FAQ</a>
+				}
+				<a href="/docs" class="flex items-center px-3 py-2 rounded-md hover:bg-accent text-foreground">
+					Documentation
+				</a>
+			</div>
+			<!-- Actions -->
+			<div class="p-6 space-y-3 border-t">
+				{{ user := ctxkeys.User(ctx) }}
+				if user != nil {
+					@button.Button(button.Props{
+						Href:      "/app/dashboard",
+						FullWidth: true,
+					}) {
+						@icon.LayoutDashboard(icon.Props{Size: 16})
+						Dashboard
+					}
+					<form action="/auth/logout" method="POST">
+						@csrf.Token()
+						@button.Button(button.Props{
+							Type:      "submit",
+							Variant:   button.VariantOutline,
+							FullWidth: true,
+						}) {
+							Logout
+						}
+					</form>
+				} else {
+					@button.Button(button.Props{
+						Href:      "/auth",
+						FullWidth: true,
+					}) {
+						Get Started
+					}
+				}
+			</div>
+		</div>
+		<!-- Footer with Theme Switcher -->
+		<div class="p-6 border-t">
+			<div class="flex items-center justify-between">
+				<span class="text-sm text-muted-foreground">Theme</span>
+				@ThemeSwitcher()
+			</div>
+		</div>
+	</div>
+}

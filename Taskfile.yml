@@ -1,0 +1,36 @@
+version: "3"
+
+tasks:
+  # Development Tools
+  templ:
+    desc: Run templ with integrated server and hot reload
+    cmds:
+      - go tool templ generate --watch --cmd="go run ./cmd/server/main.go" --proxy="http://localhost:8090" --open-browser=false
+
+  tailwind-clean:
+    desc: Clean tailwind output
+    cmds:
+      - tailwindcss -i ./assets/css/input.css -o ./assets/css/output.css --clean
+
+  tailwind-watch:
+    desc: Run tailwindcss in watch mode
+    cmds:
+      - tailwindcss -i ./assets/css/input.css -o ./assets/css/output.css --watch
+
+  # Start development server
+  dev:
+    desc: Start development server with hot reload
+    deps:
+      - tailwind-clean
+    cmds:
+      - echo "Starting services (MinIO, PostgreSQL if enabled)..."
+      # - docker compose up -d
+      - sleep 2
+      - echo "Starting app..."
+      - task --parallel tailwind-watch templ
+
+  # Stop all services
+  down:
+    desc: Stop all services
+    cmds:
+      - docker compose down

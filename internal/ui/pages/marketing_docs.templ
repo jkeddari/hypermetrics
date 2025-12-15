@@ -1,0 +1,298 @@
+package pages
+
+import (
+	"fmt"
+	"github.com/jkeddari/hypermetrics/internal/ctxkeys"
+	"github.com/jkeddari/hypermetrics/internal/model"
+	"github.com/jkeddari/hypermetrics/internal/ui/blocks"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/breadcrumb"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/button"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/collapsible"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/icon"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/sidebar"
+	"github.com/jkeddari/hypermetrics/internal/ui/layouts"
+)
+
+templ Docs(currentPage *model.DocPage, docsTree *model.DocPage, prevPage *model.DocPage, nextPage *model.DocPage) {
+	{{ cfg := ctxkeys.Config(ctx) }}
+	@layouts.Base(layouts.SEOProps{
+		Title:       fmt.Sprintf("%s - Documentation", currentPage.Title),
+		Description: currentPage.Description,
+		Path:        ctxkeys.URLPath(ctx),
+	}) {
+		@sidebar.Layout() {
+			@sidebar.Sidebar() {
+				@sidebar.Header() {
+					@sidebar.Menu() {
+						@sidebar.MenuItem() {
+							@sidebar.MenuButton(sidebar.MenuButtonProps{
+								Size: sidebar.MenuButtonSizeLg,
+								Href: "/docs",
+							}) {
+								@icon.BookOpen()
+								<div class="flex flex-col">
+									<span class="text-sm font-bold">{ cfg.AppName }</span>
+									<span class="text-xs text-muted-foreground">Documentation</span>
+								</div>
+							}
+						}
+					}
+				}
+				@sidebar.Content() {
+					@sidebar.Group() {
+						@renderDocsNav(docsTree, currentPage)
+					}
+				}
+				@sidebar.Footer() {
+					@sidebar.Menu() {
+						@sidebar.MenuItem() {
+							@sidebar.MenuButton(sidebar.MenuButtonProps{
+								Href: "/",
+							}) {
+								@icon.House(icon.Props{Class: "size-4"})
+								<span>Home</span>
+							}
+						}
+						@sidebar.MenuItem() {
+							@sidebar.MenuButton(sidebar.MenuButtonProps{
+								Href: "mailto:" + cfg.SupportEmail,
+							}) {
+								@icon.MessageCircleQuestionMark(icon.Props{Class: "size-4"})
+								<span>Support</span>
+							}
+						}
+					}
+				}
+			}
+			@sidebar.Inset() {
+				// Top Navigation Bar
+				<header class="sticky top-0 z-10 border-b bg-background">
+					<div class="flex h-14 items-center px-6">
+						<div class="flex items-center gap-4">
+							@sidebar.Trigger()
+							@templ.Fragment("docs-breadcrumb") {
+								<div id="docs-breadcrumb" hx-swap-oob="true">
+									@breadcrumb.Breadcrumb() {
+										@breadcrumb.List() {
+											@breadcrumb.Item() {
+												@breadcrumb.Link(breadcrumb.LinkProps{Href: "/"}) {
+													Home
+												}
+											}
+											@breadcrumb.Item() {
+												@breadcrumb.Separator()
+												if currentPage.Slug != "" {
+													@breadcrumb.Link(breadcrumb.LinkProps{Href: "/docs"}) {
+														Docs
+													}
+												} else {
+													@breadcrumb.Page() {
+														Docs
+													}
+												}
+											}
+											if currentPage.Slug != "" {
+												@breadcrumb.Item() {
+													@breadcrumb.Separator()
+													@breadcrumb.Page() {
+														{ currentPage.Title }
+													}
+												}
+											}
+										}
+									}
+								</div>
+							}
+						</div>
+						<div class="ml-auto flex items-center gap-4">
+							@blocks.ThemeSwitcher()
+						</div>
+					</div>
+				</header>
+				// Documentation content with HTMX target wrapper
+				<div id="docs-content-wrapper">
+					@templ.Fragment("docs-content") {
+						// Documentation Content
+						<div class="flex-1" id="docs-content">
+							<article class="container max-w-5xl px-6 py-12">
+								// Page Title
+								<div class="mb-8">
+									<h1 class="text-4xl font-bold mb-2">{ currentPage.Title }</h1>
+									if currentPage.Description != "" {
+										<p class="text-xl text-muted-foreground">{ currentPage.Description }</p>
+									}
+								</div>
+								// Content
+								@blocks.ContentWithProse(currentPage.HTMLContent)
+								// Navigation Footer
+								<div class="mt-12 pt-8 border-t">
+									<div class="flex justify-between">
+										if prevPage != nil {
+											@button.Button(button.Props{
+												Href:    fmt.Sprintf("/docs/%s", prevPage.Slug),
+												Variant: button.VariantOutline,
+												Attributes: templ.Attributes{
+													"hx-get":      fmt.Sprintf("/docs/%s", prevPage.Slug),
+													"hx-target":   "#docs-content-wrapper",
+													"hx-push-url": "true",
+													"hx-swap":     "innerHTML",
+												},
+											}) {
+												← { prevPage.Title }
+											}
+										}
+										if nextPage != nil {
+											@button.Button(button.Props{
+												Href:    fmt.Sprintf("/docs/%s", nextPage.Slug),
+												Variant: button.VariantOutline,
+												Attributes: templ.Attributes{
+													"hx-get":      fmt.Sprintf("/docs/%s", nextPage.Slug),
+													"hx-target":   "#docs-content-wrapper",
+													"hx-push-url": "true",
+													"hx-swap":     "innerHTML",
+												},
+											}) {
+												{ nextPage.Title } →
+											}
+										}
+									</div>
+								</div>
+							</article>
+						</div>
+					}
+				</div>
+				@blocks.Footer()
+			}
+			// HTMX active state updater
+			<script nonce={ templ.GetNonce(ctx) }>
+				// Update active states after HTMX navigation
+				document.body.addEventListener('htmx:afterSettle', () => {
+					const currentPath = window.location.pathname;
+					
+					// Update all sidebar menu buttons
+					document.querySelectorAll('[data-tui-sidebar="menu-button"]').forEach(button => {
+						const href = button.getAttribute('href');
+						if (href) {
+							if (href === currentPath) {
+								button.setAttribute('data-tui-sidebar-active', 'true');
+							} else {
+								button.removeAttribute('data-tui-sidebar-active');
+							}
+						}
+					});
+					
+					// Update all sidebar menu sub-buttons
+					document.querySelectorAll('[data-tui-sidebar="menu-sub-button"]').forEach(button => {
+						const href = button.getAttribute('href');
+						if (href) {
+							if (href === currentPath) {
+								button.setAttribute('data-tui-sidebar-active', 'true');
+							} else {
+								button.removeAttribute('data-tui-sidebar-active');
+							}
+						}
+					});
+				});
+
+				// Scroll to top and close mobile sheet after content swap
+				document.body.addEventListener('htmx:afterSwap', (e) => {
+					if (e.detail.target.id === 'docs-content-wrapper') {
+						window.scrollTo(0, 0);
+
+						// Close mobile sheet if open
+						const sheet = document.querySelector('[data-tui-dialog-content][data-tui-dialog-open="true"][data-tui-sheet-content]');
+						if (sheet) {
+							window.tui.dialog.close(sheet.getAttribute('data-dialog-instance'));
+						}
+					}
+				});
+			</script>
+		}
+		@blocks.HighlightScripts()
+	}
+}
+
+// Helper function to check if a node or any of its descendants contains the current page
+func nodeContainsCurrentPage(node *model.DocPage, currentPage *model.DocPage) bool {
+	if node.Slug == currentPage.Slug {
+		return true
+	}
+	for _, child := range node.Children {
+		if nodeContainsCurrentPage(child, currentPage) {
+			return true
+		}
+	}
+	return false
+}
+
+templ renderDocsNav(node *model.DocPage, currentPage *model.DocPage) {
+	@sidebar.Menu() {
+		for _, child := range node.Children {
+			@renderDocMenuItem(child, currentPage)
+		}
+	}
+}
+
+templ renderDocMenuItem(node *model.DocPage, currentPage *model.DocPage) {
+	@sidebar.MenuItem() {
+		if len(node.Children) > 0 {
+			// Has children - render as collapsible group
+			@collapsible.Collapsible(collapsible.Props{
+				Open:  nodeContainsCurrentPage(node, currentPage),
+				Class: "group/collapsible w-full",
+			}) {
+				@collapsible.Trigger() {
+					@sidebar.MenuButton(sidebar.MenuButtonProps{
+						Tooltip: node.Title,
+					}) {
+						<span>{ node.Title }</span>
+						@icon.ChevronRight(icon.Props{
+							Class: "ml-auto size-4 transition-transform group-data-[tui-collapsible-state=open]/collapsible:rotate-90",
+						})
+					}
+				}
+				@collapsible.Content() {
+					@sidebar.MenuSub() {
+						for _, child := range node.Children {
+							if len(child.Children) > 0 {
+								// Nested section with children
+								@renderDocMenuItem(child, currentPage)
+							} else {
+								// Leaf node in submenu
+								@sidebar.MenuSubItem() {
+									@sidebar.MenuSubButton(sidebar.MenuSubButtonProps{
+										Href:     fmt.Sprintf("/docs/%s", child.Slug),
+										IsActive: ctxkeys.URLPath(ctx) == fmt.Sprintf("/docs/%s", child.Slug),
+										Attributes: templ.Attributes{
+											"hx-get":      fmt.Sprintf("/docs/%s", child.Slug),
+											"hx-target":   "#docs-content-wrapper",
+											"hx-push-url": "true",
+											"hx-swap":     "innerHTML",
+										},
+									}) {
+										{ child.Title }
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		} else {
+			// Leaf node - simple link
+			@sidebar.MenuButton(sidebar.MenuButtonProps{
+				Href:     fmt.Sprintf("/docs/%s", node.Slug),
+				IsActive: ctxkeys.URLPath(ctx) == fmt.Sprintf("/docs/%s", node.Slug),
+				Tooltip:  node.Title,
+				Attributes: templ.Attributes{
+					"hx-get":      fmt.Sprintf("/docs/%s", node.Slug),
+					"hx-target":   "#docs-content-wrapper",
+					"hx-push-url": "true",
+					"hx-swap":     "innerHTML",
+				},
+			}) {
+				<span>{ node.Title }</span>
+			}
+		}
+	}
+}

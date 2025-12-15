@@ -1,0 +1,470 @@
+package pages
+
+import (
+	"fmt"
+	"github.com/jkeddari/hypermetrics/internal/ctxkeys"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/accordion"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/button"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/card"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/icon"
+	switchcomp "github.com/jkeddari/hypermetrics/internal/ui/components/switch"
+	"github.com/jkeddari/hypermetrics/internal/ui/layouts"
+)
+
+templ Home() {
+	{{ cfg := ctxkeys.Config(ctx) }}
+	@layouts.Home(layouts.SEOProps{
+		Title:       fmt.Sprintf("Welcome to %s", cfg.AppName),
+		Description: "Real-time analytics and insights for the Hyperliquid protocol. Track leaderboards, monitor addresses, and get alerts on major wallet movements.",
+		Path:        ctxkeys.URLPath(ctx),
+	}) {
+		<div class="min-h-screen">
+			@HomeHero()
+			@HomeFeatures()
+			@HomeTrustedBy()
+			@HomePricing()
+			@HomeStats()
+			@HomeFAQ()
+			@HomeCTA()
+		</div>
+	}
+}
+
+templ HomeHero() {
+	<section id="hero" class="relative overflow-hidden py-24">
+		<div class="container mx-auto px-4">
+			<div class="mx-auto max-w-5xl text-center">
+				<h1 class="text-5xl font-bold tracking-tight sm:text-6xl lg:text-7xl">
+					Track Hyperliquid Like
+					<br/>
+					<span class="bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">Never Before</span>
+				</h1>
+				<p class="mx-auto mt-6 max-w-2xl text-xl text-muted-foreground">
+					Real-time analytics, leaderboards, and whale tracking for the Hyperliquid protocol.
+					Monitor on-chain activity and get instant alerts.
+				</p>
+				<!-- Social Proof with Avatar Group -->
+				<div class="mt-8 flex flex-col items-center justify-center gap-4">
+					<div class="text-center">
+						<p class="text-sm font-medium">Trusted by traders and DeFi enthusiasts</p>
+						<div class="flex items-center justify-center gap-1 mt-1">
+							for i := 0; i < 5; i++ {
+								@icon.Star(icon.Props{Size: 14, Class: "fill-yellow-500 text-yellow-500"})
+							}
+							<span class="ml-1 text-xs text-muted-foreground">Real-time on-chain analytics</span>
+						</div>
+					</div>
+				</div>
+				<div class="mt-10 flex flex-col sm:flex-row w-full sm:w-auto items-center justify-center gap-3 px-4 sm:px-0">
+					@button.Button(button.Props{
+						Href:  "/auth",
+						Size:  button.SizeLg,
+						Class: "w-full sm:w-auto",
+					}) {
+						Start Tracking →
+					}
+					@button.Button(button.Props{
+						Href:    "#features",
+						Variant: button.VariantOutline,
+						Size:    button.SizeLg,
+						Class:   "w-full sm:w-auto",
+					}) {
+						View Features
+					}
+				</div>
+			</div>
+		</div>
+	</section>
+}
+
+templ HomeFeatures() {
+	<section id="features" class="py-24">
+		<div class="container mx-auto px-4">
+			<div class="mx-auto max-w-3xl text-center mb-16">
+				<h2 class="text-4xl font-bold">Powerful analytics for Hyperliquid traders</h2>
+				<p class="mt-4 text-lg text-muted-foreground">
+					All the tools you need to track and analyze on-chain activity in real-time.
+				</p>
+			</div>
+			<div class="mx-auto max-w-6xl grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+				@HomeFeatureCard(
+					"ChartBar",
+					"Leaderboard Tracking",
+					"Monitor the top performers on Hyperliquid with real-time leaderboard rankings and historical performance data.",
+				)
+				@HomeFeatureCard(
+					"Target",
+					"Address Analytics",
+					"Deep dive into any wallet address. View trading history, PnL, positions, and detailed transaction analysis.",
+				)
+				@HomeFeatureCard(
+					"Zap",
+					"Large Transactions",
+					"Track the biggest moves in real-time. Never miss a whale transaction or significant market movement.",
+				)
+				@HomeFeatureCard(
+					"Bell",
+					"Custom Alerts",
+					"Get instant notifications when tracked addresses make moves. Set custom thresholds and never miss important activity.",
+				)
+				@HomeFeatureCard(
+					"Globe",
+					"Real-time Data",
+					"Live updates from the Hyperliquid blockchain. All metrics refreshed in real-time for accurate decision making.",
+				)
+				@HomeFeatureCard(
+					"Shield",
+					"Secure & Private",
+					"Your watchlists and alerts are private. We never share your tracked addresses or trading strategies.",
+				)
+			</div>
+		</div>
+	</section>
+}
+
+templ HomeFeatureCard(iconName string, title string, description string) {
+	<div class="group relative">
+		<div class="flex flex-col gap-4 items-center sm:items-start">
+			<div class="inline-flex size-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
+				switch iconName {
+					case "Target":
+						@icon.Target(icon.Props{Size: 24})
+					case "ChartBar":
+						@icon.ChartBar(icon.Props{Size: 24})
+					case "Zap":
+						@icon.Zap(icon.Props{Size: 24})
+					case "Bell":
+						@icon.Bell(icon.Props{Size: 24})
+					case "Globe":
+						@icon.Globe(icon.Props{Size: 24})
+					case "Shield":
+						@icon.Shield(icon.Props{Size: 24})
+					default:
+						@icon.Star(icon.Props{Size: 24})
+				}
+			</div>
+			<div class="text-center sm:text-left">
+				<h3 class="text-lg font-semibold">{ title }</h3>
+				<p class="mt-2 text-sm text-muted-foreground">
+					{ description }
+				</p>
+			</div>
+		</div>
+	</div>
+}
+
+templ HomePricing() {
+	<section id="pricing" class="py-24">
+		<div class="container mx-auto px-4">
+			<div class="mx-auto max-w-3xl text-center">
+				<h2 class="text-4xl font-bold">Choose Your Plan</h2>
+				<p class="mt-4 text-lg text-muted-foreground">
+					Start tracking for free, upgrade for advanced features and unlimited alerts.
+				</p>
+				<div class="mt-8 flex items-center justify-center gap-3">
+					<span class="text-sm font-medium">Monthly</span>
+					@switchcomp.Switch(switchcomp.Props{
+						ID:   "pricing-toggle",
+						Name: "pricing-toggle",
+					})
+					<span class="text-sm font-medium">Annual <span class="text-green-500">(Save 20%)</span></span>
+				</div>
+			</div>
+			<div class="mx-auto mt-16 grid max-w-6xl gap-8 lg:grid-cols-3">
+				@HomePricingCard("Free", 0, 0, false, false, []string{
+					"View leaderboards",
+					"Basic address lookup",
+					"Top 10 large transactions",
+					"Community updates",
+					"Limited refresh rate",
+				})
+				@HomePricingCard("Basic", 9, 86, true, true, []string{
+					"Track up to 50 addresses",
+					"Real-time alerts",
+					"Unlimited transaction history",
+					"Advanced analytics",
+					"Custom alert thresholds",
+					"Priority data refresh",
+					"Export data (CSV/JSON)",
+				})
+				@HomePricingCard("Pro", 19, 182, true, false, []string{
+					"Unlimited address tracking",
+					"Instant push notifications",
+					"Advanced whale detection",
+					"API access",
+					"Custom webhooks",
+					"Dedicated support",
+					"Historical data access",
+				})
+			</div>
+		</div>
+		<script nonce={ templ.GetNonce(ctx) }>
+			// Pricing toggle functionality - encapsulated within component
+			(function() {
+				const toggle = document.getElementById('pricing-toggle');
+				if (!toggle) return;
+				
+				function updatePricing(isAnnual) {
+					document.querySelectorAll('[data-price-display]').forEach(el => {
+						const monthly = el.getAttribute('data-monthly');
+						const annual = el.getAttribute('data-annual');
+						el.textContent = isAnnual ? annual : monthly;
+					});
+					
+					document.querySelectorAll('[data-billing-period]').forEach(el => {
+						el.textContent = isAnnual ? 'per year' : 'per month';
+					});
+				}
+				
+				toggle.addEventListener('change', function() {
+					updatePricing(this.checked);
+				});
+			})();
+		</script>
+	</section>
+}
+
+templ HomePricingCard(name string, monthlyPrice int, annualPrice int, disabled bool, popular bool, features []string) {
+	@card.Card(card.Props{
+		Class: "relative overflow-hidden h-full flex flex-col",
+	}) {
+		if popular {
+			<div class="absolute -right-12 top-6 rotate-45 bg-primary px-12 py-1 text-xs font-semibold text-primary-foreground">
+				POPULAR
+			</div>
+		}
+		@card.Header() {
+			@card.Title() {
+				{ name }
+			}
+		}
+		@card.Content(card.ContentProps{
+			Class: "pt-6 flex flex-col flex-1",
+		}) {
+			<div class="flex items-baseline gap-1">
+				{{ monthlyDisplay := "Free" }}
+				{{ annualDisplay := "Free" }}
+				if monthlyPrice > 0 {
+					{{ monthlyDisplay = fmt.Sprintf("$%d", monthlyPrice) }}
+				}
+				if annualPrice > 0 {
+					{{ annualDisplay = fmt.Sprintf("$%d", annualPrice) }}
+				}
+				<span
+					class="text-5xl font-bold tracking-tight"
+					data-price-display
+					data-monthly={ monthlyDisplay }
+					data-annual={ annualDisplay }
+				>
+					{ monthlyDisplay }
+				</span>
+				if monthlyPrice > 0 || annualPrice > 0 {
+					<span class="text-muted-foreground" data-billing-period>per month</span>
+				}
+			</div>
+			<ul class="mt-8 space-y-4 flex-1">
+				for _, feature := range features {
+					<li class="flex items-start gap-3">
+						@icon.Check(icon.Props{
+							Size:  16,
+							Class: "mt-0.5 text-primary shrink-0",
+						})
+						<span class="text-sm">{ feature }</span>
+					</li>
+				}
+			</ul>
+			<div class="mt-auto pt-8">
+				@button.Button(button.Props{
+					Href:      "/auth",
+					Disabled:  disabled,
+					FullWidth: true,
+					Variant: func() button.Variant {
+						if popular {
+							return button.VariantDefault
+						}
+						return button.VariantOutline
+					}(),
+				}) {
+					if disabled {
+						Coming soon...
+					} else {
+						Get Started
+					}
+				}
+			</div>
+		}
+	}
+}
+
+templ HomeTrustedBy() {
+	<section class="py-16">
+		<div class="container mx-auto px-4">
+			<div class="text-center">
+				<p class="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+					Built for Hyperliquid traders
+				</p>
+				<div class="mt-8 flex flex-wrap items-center justify-center gap-x-12 gap-y-8 grayscale opacity-60">
+					<div class="flex items-center gap-2">
+						@icon.Zap(icon.Props{Size: 32})
+						<span class="text-sm font-medium">Lightning Fast</span>
+					</div>
+					<div class="flex items-center gap-2">
+						@icon.ChartBar(icon.Props{Size: 32})
+						<span class="text-sm font-medium">Real-time Data</span>
+					</div>
+					<div class="flex items-center gap-2">
+						@icon.Shield(icon.Props{Size: 32})
+						<span class="text-sm font-medium">Secure</span>
+					</div>
+					<div class="flex items-center gap-2">
+						@icon.Bell(icon.Props{Size: 32})
+						<span class="text-sm font-medium">Smart Alerts</span>
+					</div>
+					<div class="flex items-center gap-2">
+						@icon.Globe(icon.Props{Size: 32})
+						<span class="text-sm font-medium">On-chain</span>
+					</div>
+				</div>
+			</div>
+		</div>
+	</section>
+}
+
+templ HomeStats() {
+	<section class="py-24">
+		<div class="container mx-auto px-4">
+			<div class="mx-auto max-w-5xl">
+				<div class="grid grid-cols-2 gap-8 md:grid-cols-4">
+					@HomeStatCard("Users", "2.4K+", "Active traders")
+					@HomeStatCard("Target", "15K+", "Addresses tracked")
+					@HomeStatCard("Bell", "50K+", "Alerts sent daily")
+					@HomeStatCard("Zap", "<100ms", "Average latency")
+				</div>
+			</div>
+		</div>
+	</section>
+}
+
+templ HomeStatCard(iconName string, value string, label string) {
+	<div class="text-center">
+		<div class="inline-flex items-center justify-center size-12 rounded-lg bg-primary/10 text-primary mb-4">
+			switch iconName {
+				case "Users":
+					@icon.Users(icon.Props{Size: 24})
+				case "Target":
+					@icon.Target(icon.Props{Size: 24})
+				case "Bell":
+					@icon.Bell(icon.Props{Size: 24})
+				case "Zap":
+					@icon.Zap(icon.Props{Size: 24})
+				default:
+					@icon.Star(icon.Props{Size: 24})
+			}
+		</div>
+		<div class="text-3xl font-bold">{ value }</div>
+		<p class="mt-1 text-sm text-muted-foreground">{ label }</p>
+	</div>
+}
+
+templ HomeCTA() {
+	<section class="py-24">
+		<div class="container mx-auto px-4">
+			<div class="mx-auto max-w-3xl text-center">
+				<h2 class="text-4xl font-bold sm:text-5xl">
+					Ready to Track Hyperliquid?
+				</h2>
+				<p class="mt-6 text-lg text-muted-foreground">
+					Join traders using real-time analytics to stay ahead of the market.
+				</p>
+				<div class="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+					@button.Button(button.Props{
+						Href:  "/auth",
+						Size:  button.SizeLg,
+						Class: "w-full sm:w-auto",
+					}) {
+						Get Started Free →
+					}
+				</div>
+			</div>
+		</div>
+	</section>
+}
+
+templ HomeFAQ() {
+	<section id="faq" class="py-24">
+		<div class="container mx-auto px-4">
+			<div class="mx-auto max-w-3xl">
+				<div class="text-center">
+					<h2 class="text-4xl font-bold">Frequently Asked Questions</h2>
+					<p class="mt-4 text-lg text-muted-foreground">
+						Everything you need to know about Hypermetrics
+					</p>
+				</div>
+				<div class="mt-16">
+					@accordion.Accordion() {
+						@accordion.Item() {
+							@accordion.Trigger() {
+								What is Hypermetrics?
+							}
+							@accordion.Content() {
+								<p>
+									Hypermetrics is a real-time analytics platform for the Hyperliquid protocol. We provide
+									comprehensive tracking of leaderboards, wallet addresses, large transactions, and more.
+									Our platform helps traders make informed decisions with up-to-the-second on-chain data.
+								</p>
+							}
+						}
+						@accordion.Item() {
+							@accordion.Trigger() {
+								How do alerts work?
+							}
+							@accordion.Content() {
+								<p>
+									Set up custom alerts for any wallet address you're tracking. Get notified instantly when
+									there's activity that matches your criteria - whether it's a large transaction, a position
+									change, or any other on-chain event. Basic and Pro plans include real-time push notifications.
+								</p>
+							}
+						}
+						@accordion.Item() {
+							@accordion.Trigger() {
+								How many addresses can I track?
+							}
+							@accordion.Content() {
+								<p>
+									The Free plan allows basic address lookups. The Basic plan lets you track up to 50 addresses
+									with custom alerts. The Pro plan offers unlimited address tracking with advanced features
+									like instant notifications and webhook integrations.
+								</p>
+							}
+						}
+						@accordion.Item() {
+							@accordion.Trigger() {
+								Where does the data come from?
+							}
+							@accordion.Content() {
+								<p>
+									All data is sourced directly from the Hyperliquid blockchain in real-time. We maintain
+									our own infrastructure to ensure fast, reliable access to on-chain data. Our systems
+									are optimized for low latency (typically under 100ms) to give you the most current information.
+								</p>
+							}
+						}
+						@accordion.Item() {
+							@accordion.Trigger() {
+								Can I export tracked data?
+							}
+							@accordion.Content() {
+								<p>
+									Yes! Basic and Pro plans include data export features. Download your tracked addresses,
+									transaction history, and analytics in CSV or JSON formats. Perfect for building your own
+									analysis tools or keeping records.
+								</p>
+							}
+						}
+					}
+				</div>
+			</div>
+		</div>
+	</section>
+}

@@ -1,0 +1,308 @@
+package pages
+
+import (
+	"github.com/jkeddari/hypermetrics/internal/ctxkeys"
+	"github.com/jkeddari/hypermetrics/internal/model"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/badge"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/button"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/card"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/csrf"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/icon"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/tabs"
+	"github.com/jkeddari/hypermetrics/internal/ui/layouts"
+	"github.com/jkeddari/hypermetrics/internal/utils"
+)
+
+templ Billing() {
+	{{ subscription := ctxkeys.Subscription(ctx) }}
+	@layouts.App("Billing") {
+		<div class="container max-w-6xl px-6 py-8">
+			<div class="mb-8">
+				<h1 class="text-3xl font-bold">Billing</h1>
+				<p class="text-muted-foreground mt-2">Manage your subscription and billing</p>
+			</div>
+			<div class="space-y-6">
+				@card.Card() {
+					@card.Header() {
+						@card.Title() {
+							Current Plan
+						}
+						@card.Description() {
+							Your active subscription
+						}
+					}
+					@card.Content() {
+						<div class="flex items-center justify-between">
+							<div>
+								<div class="flex items-center gap-3 mb-2">
+									<h3 class="text-2xl font-bold capitalize">{ subscription.PlanID }</h3>
+									if subscription.PlanID != model.SubscriptionPlanFree && subscription.FormatPrice() != "" {
+										<span class="text-lg text-muted-foreground">{ subscription.FormatPrice() }</span>
+									}
+									if subscription.Status == model.SubscriptionStatusActive {
+										@badge.Badge(badge.Props{Class: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"}) {
+											Active
+										}
+									} else if subscription.Status == model.SubscriptionStatusCancelled {
+										@badge.Badge(badge.Props{Variant: badge.VariantDestructive}) {
+											Cancelled
+										}
+									} else {
+										@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {
+											{ subscription.Status }
+										}
+									}
+									if subscription.HasFeature(model.FeaturePrioritySupport) {
+										@badge.Badge(badge.Props{Class: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"}) {
+											Priority Support
+										}
+									}
+								</div>
+								if subscription.PlanID != model.SubscriptionPlanFree && subscription.CurrentPeriodEnd != nil {
+									if subscription.Status == model.SubscriptionStatusActive {
+										<p class="text-sm text-muted-foreground">
+											Next billing date: { subscription.CurrentPeriodEnd.Format("January 2, 2006") }
+										</p>
+									} else if subscription.Status == model.SubscriptionStatusCancelled {
+										<p class="text-sm text-muted-foreground">
+											Access until: { subscription.CurrentPeriodEnd.Format("January 2, 2006") }
+										</p>
+									}
+								}
+							</div>
+							if subscription.ProviderCustomerID != nil {
+								<a href="/app/billing/portal">
+									@button.Button(button.Props{
+										Variant: button.VariantOutline,
+									}) {
+										Manage Subscription
+									}
+								</a>
+							}
+						</div>
+					}
+				}
+				<div>
+					<div class="flex items-center justify-between mb-4">
+						<h3 class="text-xl font-bold">Available Plans</h3>
+						@tabs.Tabs() {
+							@tabs.List() {
+								@tabs.Trigger(tabs.TriggerProps{
+									Value:    "monthly",
+									IsActive: true,
+									Attributes: templ.Attributes{
+										"data-billing-interval": "monthly",
+									},
+								}) {
+									Monthly
+								}
+								@tabs.Trigger(tabs.TriggerProps{
+									Value: "yearly",
+									Attributes: templ.Attributes{
+										"data-billing-interval": "yearly",
+									},
+								}) {
+									Yearly
+									<span class="ml-1 text-xs text-green-600 dark:text-green-400 font-semibold">Save 20%</span>
+								}
+							}
+						}
+					</div>
+					<div class="grid md:grid-cols-3 gap-4">
+						@BillingPricingCard(
+							"Free",
+							"$0",
+							"month",
+							"$0",
+							"year",
+							"Perfect for getting started",
+							[]string{
+								"View leaderboards",
+								"Basic address lookup",
+								"Top 10 large transactions",
+								"Community updates",
+								"Limited refresh rate",
+							},
+							model.SubscriptionPlanFree,
+							subscription.PlanID,
+							subscription.PlanID != model.SubscriptionPlanFree,
+							false,
+						)
+						@BillingPricingCard(
+							"Basic",
+							"$9",
+							"month",
+							"$86",
+							"year",
+							"For active traders",
+							[]string{
+								"Track up to 50 addresses",
+								"Real-time alerts",
+								"Unlimited transaction history",
+								"Advanced analytics",
+								"Custom alert thresholds",
+								"Priority data refresh",
+								"Export data (CSV/JSON)",
+							},
+							model.SubscriptionPlanBasic,
+							subscription.PlanID,
+							subscription.PlanID != model.SubscriptionPlanFree,
+							true,
+						)
+						@BillingPricingCard(
+							"Pro",
+							"$19",
+							"month",
+							"$182",
+							"year",
+							"For professional traders",
+							[]string{
+								"Unlimited address tracking",
+								"Instant push notifications",
+								"Advanced whale detection",
+								"API access",
+								"Custom webhooks",
+								"Dedicated support",
+								"Historical data access",
+							},
+							model.SubscriptionPlanPro,
+							subscription.PlanID,
+							subscription.PlanID != model.SubscriptionPlanFree,
+							true,
+						)
+					</div>
+				</div>
+				<script nonce={ templ.GetNonce(ctx) }>
+					// Toggle prices based on interval
+					function togglePrices(interval) {
+						document.querySelectorAll('.pricing-card').forEach(card => {
+							card.querySelector('.price-monthly')?.classList.toggle('hidden', interval !== 'monthly');
+							card.querySelector('.price-yearly')?.classList.toggle('hidden', interval !== 'yearly');
+							const input = card.querySelector('input[name="interval"]');
+							if (input) input.value = interval;
+						});
+					}
+
+					// Listen for tab clicks
+					document.addEventListener('click', (e) => {
+						const trigger = e.target.closest('[data-billing-interval]');
+						if (trigger) togglePrices(trigger.getAttribute('data-billing-interval'));
+					});
+
+					// Init with monthly
+					togglePrices('monthly');
+				</script>
+			</div>
+		</div>
+		@tabs.Script()
+	}
+}
+
+templ BillingPricingCard(
+	name string,
+	monthlyPrice string,
+	monthlyPeriod string,
+	yearlyPrice string,
+	yearlyPeriod string,
+	description string,
+	features []string,
+	planID string,
+	currentPlanID string,
+	hasPaidSubscription bool,
+	disabled bool,
+) {
+	@card.Card(card.Props{
+		Class: utils.TwMerge(
+			"pricing-card relative h-full flex flex-col",
+			utils.If(planID == model.SubscriptionPlanBasic, "border-primary ring-2 ring-primary"),
+		),
+	}) {
+		if planID == model.SubscriptionPlanBasic {
+			<div class="absolute -top-4 left-1/2 -translate-x-1/2">
+				@badge.Badge() {
+					Most Popular
+				}
+			</div>
+		}
+		@card.Header() {
+			@card.Title(card.TitleProps{Class: "text-2xl"}) {
+				{ name }
+			}
+			<div class="mt-2">
+				if planID == model.SubscriptionPlanFree {
+					<div class="flex items-baseline gap-1">
+						<span class="text-4xl font-bold">{ monthlyPrice }</span>
+						<span class="text-muted-foreground">/ Free forever</span>
+					</div>
+				} else {
+					<div class="price-monthly flex items-baseline gap-1">
+						<span class="text-4xl font-bold">{ monthlyPrice }</span>
+						<span class="text-muted-foreground">/ { monthlyPeriod }</span>
+					</div>
+					<div class="price-yearly hidden flex items-baseline gap-1">
+						<span class="text-4xl font-bold">{ yearlyPrice }</span>
+						<span class="text-muted-foreground">/ { yearlyPeriod }</span>
+					</div>
+				}
+			</div>
+			@card.Description(card.DescriptionProps{Class: "mt-2"}) {
+				{ description }
+			}
+		}
+		@card.Content(card.ContentProps{Class: "flex-grow"}) {
+			<ul class="space-y-3">
+				for _, feature := range features {
+					<li class="flex items-start gap-2">
+						@icon.Check(icon.Props{Size: 20, Class: "text-primary mt-0.5 shrink-0"})
+						<span class="text-sm">{ feature }</span>
+					</li>
+				}
+			</ul>
+		}
+		@card.Footer(card.FooterProps{Class: "pt-0 mt-auto"}) {
+			if disabled {
+				@button.Button(button.Props{
+					Variant:  button.VariantOutline,
+					Class:    "w-full",
+					Disabled: true,
+				}) {
+					Coming soon...
+				}
+			} else if planID == currentPlanID {
+				@button.Button(button.Props{
+					Variant:  button.VariantOutline,
+					Class:    "w-full",
+					Disabled: true,
+				}) {
+					Current Plan
+				}
+			} else if planID != model.SubscriptionPlanFree && !hasPaidSubscription {
+				<form
+					action="/app/billing/checkout"
+					method="POST"
+					class="w-full"
+				>
+					@csrf.Token()
+					<input type="hidden" name="plan_id" value={ planID }/>
+					<input type="hidden" name="interval" value="monthly"/>
+					if planID == model.SubscriptionPlanBasic {
+						@button.Button(button.Props{
+							Type:  "submit",
+							Class: "w-full",
+						}) {
+							Upgrade to { name }
+						}
+					} else {
+						@button.Button(button.Props{
+							Type:    "submit",
+							Class:   "w-full",
+							Variant: button.VariantOutline,
+						}) {
+							Upgrade to { name }
+						}
+					}
+				</form>
+			}
+		}
+	}
+}

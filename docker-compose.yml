@@ -1,0 +1,53 @@
+# Development Services
+# Run with: task dev
+
+services:
+  # MinIO (S3-compatible storage) - ENABLED by default
+  # Provides local S3 storage for file uploads without cloud costs
+  # Console: http://localhost:9001 (minioadmin/minioadmin)
+  # Create bucket 'dev-uploads' after first start
+  # See: docs/guides/cloud-storage.md
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # Web Console
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # PostgreSQL (Optional - uncomment if you prefer PostgreSQL over SQLite)
+  # Default: SQLite (no setup needed, works out-of-the-box)
+  # To enable: Uncomment service below + update .env with DB_DRIVER=pgx
+  # See: docs/guides/postgresql.md
+  # postgres:
+  #   image: postgres:16-alpine
+  #   environment:
+  #     POSTGRES_DB: goilerplate_dev
+  #     POSTGRES_USER: goilerplate
+  #     POSTGRES_PASSWORD: dev_password
+  #   ports:
+  #     - "5432:5432"
+  #   volumes:
+  #     - postgres-data:/var/lib/postgresql/data
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U goilerplate"]
+  #     interval: 5s
+  #     timeout: 5s
+  #     retries: 5
+
+volumes:
+  # MinIO data persistence
+  minio-data:
+    driver: local
+  # PostgreSQL data persistence (if enabled)
+  postgres-data:
+    driver: local
