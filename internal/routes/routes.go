@@ -24,7 +24,7 @@ func SetupRoutes(app *app.App) http.Handler {
 	settings := handler.NewSettingsHandler()
 	// goal := handler.NewGoalHandler(app.GoalService)
 	billing := handler.NewBillingHandler(app.SubscriptionService, app.PaymentService)
-	leaderboard := handler.NewLeaderboardHandler()
+	leaderboard := handler.NewLeaderboardHandler(app.LeaderboardService)
 	topPositions := handler.NewTopPositionsHandler()
 
 	mux := http.NewServeMux()

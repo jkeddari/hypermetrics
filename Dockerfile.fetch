@@ -1,0 +1,19 @@
+FROM golang:1.25
+
+WORKDIR /app
+
+# Copy go mod files
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source code
+COPY . .
+
+# Build the fetch command
+RUN go build -o /app/fetch ./cmd/fetch
+
+# Set timezone to Europe/Paris
+ENV TZ=Europe/Paris
+
+ENTRYPOINT ["/app/fetch"]
+CMD ["leaderboard"]

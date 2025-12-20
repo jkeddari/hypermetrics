@@ -53,6 +53,7 @@ type App struct {
 	PaymentService      payment.Provider
 	DocsService         *service.DocsService
 	LegalService        *service.LegalService
+	LeaderboardService  *service.LeaderboardS3Service
 }
 
 func New(cfg *config.Config) (*App, error) {
@@ -132,6 +133,12 @@ func New(cfg *config.Config) (*App, error) {
 	docsService := service.NewDocsService(cfg.ContentPath)
 	legalService := service.NewLegalService(cfg.ContentPath)
 
+	// Initialize leaderboard service (S3-based)
+	leaderboardService, err := service.NewLeaderboardS3Service(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize leaderboard service: %v", err)
+	}
+
 	// Create dev test user
 	if cfg.IsDevelopment() {
 		// Check if test user already exists
@@ -191,6 +198,7 @@ func New(cfg *config.Config) (*App, error) {
 		PaymentService:      paymentProvider,
 		DocsService:         docsService,
 		LegalService:        legalService,
+		LeaderboardService:  leaderboardService,
 	}, nil
 }
 

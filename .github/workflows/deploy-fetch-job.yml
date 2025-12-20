@@ -1,0 +1,76 @@
+name: Deploy Fetch Leaderboard Job
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'cmd/fetch/**'
+      - 'internal/hypermetrics/leaderboard/**'
+      - 'internal/storage/**'
+      - 'Dockerfile.fetch'
+      - '.github/workflows/deploy-fetch-job.yml'
+  workflow_dispatch:  # Permet de lancer manuellement
+
+env:
+  PROJECT_ID: hypermetrics-479118
+  REGION: europe-west1
+  REPOSITORY: cloud-run-source-deploy
+  IMAGE_NAME: hypermetrics/hypermetrics-fetch-leaderboard
+  JOB_NAME: hypermetrics-fetch-leaderboard
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write  # Nécessaire pour Workload Identity Federation
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: |
+          gcloud auth configure-docker europe-west1-docker.pkg.dev
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            -f Dockerfile.fetch \
+            -t europe-west1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            -t europe-west1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:latest \
+            .
+
+      - name: Push Docker image
+        run: |
+          docker push europe-west1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          docker push europe-west1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:latest
+
+      - name: Deploy Cloud Run Job
+        run: |
+          gcloud run jobs deploy ${{ env.JOB_NAME }} \
+            --image=europe-west1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            --region=${{ env.REGION }} \
+            --memory=512Mi \
+            --cpu=1 \
+            --max-retries=2 \
+            --task-timeout=10m \
+            --quiet
+
+      - name: Job deployed successfully
+        run: |
+          echo "✅ Cloud Run Job deployed successfully!"
+          echo "Job name: ${{ env.JOB_NAME }}"
+          echo "Region: ${{ env.REGION }}"
+          echo "Image: europe-west1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"

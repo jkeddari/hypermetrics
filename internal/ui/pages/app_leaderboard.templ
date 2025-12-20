@@ -1,0 +1,314 @@
+package pages
+
+import (
+	"fmt"
+	"strconv"
+	"time"
+	"github.com/jkeddari/hypermetrics/internal/hypermetrics/leaderboard"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/badge"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/table"
+	"github.com/jkeddari/hypermetrics/internal/ui/components/tabs"
+	"github.com/jkeddari/hypermetrics/internal/ui/layouts"
+)
+
+templ Leaderboard(data []leaderboard.LeaderBoardRow, sortBy string, period string, lastRefresh time.Time) {
+	@layouts.App("Leaderboard") {
+		<div class="container max-w-7xl px-6 py-8">
+			<div class="mb-8">
+				<h1 class="text-3xl font-bold">Hyperliquid Leaderboard</h1>
+				<p class="text-muted-foreground mt-2">
+					Top 100 traders on Hyperliquid protocol
+					<span class="ml-2 text-xs">
+						• Refreshes every hour
+						if !lastRefresh.IsZero() {
+							({ formatLastRefresh(lastRefresh) })
+						}
+					</span>
+				</p>
+			</div>
+			if len(data) == 0 {
+				<div class="rounded-lg border bg-card p-12 text-center">
+					<p class="text-muted-foreground">Loading leaderboard data...</p>
+					<p class="text-sm text-muted-foreground mt-2">This may take up to 30 seconds for the first load.</p>
+				</div>
+			} else {
+				@LeaderboardTabs(data, sortBy, period)
+			}
+		</div>
+	}
+}
+
+templ LeaderboardTabs(data []leaderboard.LeaderBoardRow, sortBy string, period string) {
+	<div class="rounded-lg border bg-card">
+		@tabs.Tabs() {
+			@LeaderboardTabsList(period)
+			<div class="p-4 sm:p-6">
+				@tabs.Content(tabs.ContentProps{Value: "daily", IsActive: period == "daily"}) {
+					@LeaderboardTable(data, sortBy, "daily")
+				}
+				@tabs.Content(tabs.ContentProps{Value: "weekly", IsActive: period == "weekly"}) {
+					@LeaderboardTable(data, sortBy, "weekly")
+				}
+				@tabs.Content(tabs.ContentProps{Value: "monthly", IsActive: period == "monthly"}) {
+					@LeaderboardTable(data, sortBy, "monthly")
+				}
+				@tabs.Content(tabs.ContentProps{Value: "alltime", IsActive: period == "alltime"}) {
+					@LeaderboardTable(data, sortBy, "alltime")
+				}
+			</div>
+		}
+	</div>
+}
+
+templ LeaderboardTabsList(period string) {
+	<div class="border-b bg-muted/30 overflow-x-auto">
+		@tabs.List(tabs.ListProps{Class: "h-auto p-0 bg-transparent min-w-fit"}) {
+			<a href="/app/leaderboard?sort=dailypnl">
+				@tabs.Trigger(tabs.TriggerProps{Value: "daily", IsActive: period == "daily"}) {
+					Daily
+				}
+			</a>
+			<a href="/app/leaderboard?sort=weeklypnl">
+				@tabs.Trigger(tabs.TriggerProps{Value: "weekly", IsActive: period == "weekly"}) {
+					Weekly
+				}
+			</a>
+			<a href="/app/leaderboard?sort=monthlypnl">
+				@tabs.Trigger(tabs.TriggerProps{Value: "monthly", IsActive: period == "monthly"}) {
+					Monthly
+				}
+			</a>
+			<a href="/app/leaderboard?sort=alltimepnl">
+				@tabs.Trigger(tabs.TriggerProps{Value: "alltime", IsActive: period == "alltime"}) {
+					All Time
+				}
+			</a>
+		}
+	</div>
+}
+
+templ LeaderboardTable(data []leaderboard.LeaderBoardRow, sortBy string, period string) {
+	<div class="rounded-md border">
+		@table.Table() {
+			@table.Header() {
+				@table.Row() {
+					@table.Head(table.HeadProps{Class: "w-16"}) {
+						Rank
+					}
+					@table.Head() {
+						Address
+					}
+					@table.Head(table.HeadProps{Class: "text-right"}) {
+						<a href={ templ.URL(fmt.Sprintf("/app/leaderboard?sort=value&period=%s", period)) } class="hover:underline flex items-center justify-end gap-1">
+							Account Value
+							if sortBy == "value" {
+								<span>↓</span>
+							}
+						</a>
+					}
+					@table.Head(table.HeadProps{Class: "text-right"}) {
+						<a href={ templ.URL(fmt.Sprintf("/app/leaderboard?sort=%spnl", period)) } class="hover:underline flex items-center justify-end gap-1">
+							PNL
+							if sortBy == period+"pnl" {
+								<span>↓</span>
+							}
+						</a>
+					}
+					@table.Head(table.HeadProps{Class: "text-right"}) {
+						<a href={ templ.URL(fmt.Sprintf("/app/leaderboard?sort=%sroi", period)) } class="hover:underline flex items-center justify-end gap-1">
+							ROI
+							if sortBy == period+"roi" {
+								<span>↓</span>
+							}
+						</a>
+					}
+					@table.Head(table.HeadProps{Class: "text-right"}) {
+						<a href={ templ.URL(fmt.Sprintf("/app/leaderboard?sort=%svlm", period)) } class="hover:underline flex items-center justify-end gap-1">
+							Volume
+							if sortBy == period+"vlm" {
+								<span>↓</span>
+							}
+						</a>
+					}
+				}
+			}
+			@table.Body() {
+				for idx, row := range data {
+					@LeaderboardRow(idx+1, row, period)
+				}
+			}
+		}
+	</div>
+}
+
+templ LeaderboardRow(rank int, row leaderboard.LeaderBoardRow, period string) {
+	{{ metrics := getPeriodMetrics(row, period) }}
+	@table.Row() {
+		@table.Cell(table.CellProps{Class: "font-bold"}) {
+			<span class="text-muted-foreground">{ fmt.Sprintf("#%d", rank) }</span>
+		}
+		@table.Cell(table.CellProps{Class: "font-mono"}) {
+			<div class="flex items-center gap-2">
+				<span class="text-sm">{ formatAddress(row.EthAddress) }</span>
+				if row.DisplayName != nil && *row.DisplayName != "" {
+					@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {
+						{ *row.DisplayName }
+					}
+				}
+			</div>
+		}
+		@table.Cell(table.CellProps{Class: "text-right font-medium"}) {
+			{ formatAccountValue(row.AccountValue) }
+		}
+		@table.Cell(table.CellProps{Class: "text-right"}) {
+			<span class={ getPNLClass(metrics.PNL) }>
+				{ formatCurrency(metrics.PNL) }
+			</span>
+		}
+		@table.Cell(table.CellProps{Class: "text-right"}) {
+			<span class={ getROIClass(metrics.ROI) }>
+				{ formatPercentage(metrics.ROI) }
+			</span>
+		}
+		@table.Cell(table.CellProps{Class: "text-right text-muted-foreground"}) {
+			{ formatCurrency(metrics.VLM) }
+		}
+	}
+}
+
+// Helper functions
+func getPeriodMetrics(row leaderboard.LeaderBoardRow, period string) leaderboard.PerformanceMetrics {
+	switch period {
+	case "daily":
+		return row.DailyPerformance
+	case "weekly":
+		return row.WeekPerformance
+	case "monthly":
+		return row.MonthPerformance
+	case "alltime":
+		return row.AllPerformance
+	default:
+		return row.DailyPerformance
+	}
+}
+
+func formatAddress(addr string) string {
+	return addr
+}
+
+func formatAccountValue(value string) string {
+	f, err := strconv.ParseFloat(value, 64)
+	if err != nil {
+		return value
+	}
+
+	absF := f
+	if f < 0 {
+		absF = -f
+	}
+
+	sign := ""
+	if f < 0 {
+		sign = "-"
+	}
+	// No + sign for account value
+
+	if absF >= 1000000 {
+		return fmt.Sprintf("%s$%.2fM", sign, absF/1000000)
+	} else if absF >= 1000 {
+		return fmt.Sprintf("%s$%.2fK", sign, absF/1000)
+	}
+	return fmt.Sprintf("%s$%.2f", sign, absF)
+}
+
+func formatCurrency(value string) string {
+	f, err := strconv.ParseFloat(value, 64)
+	if err != nil {
+		return value
+	}
+
+	absF := f
+	if f < 0 {
+		absF = -f
+	}
+
+	sign := ""
+	if f < 0 {
+		sign = "-"
+	} else if f > 0 {
+		sign = "+"
+	}
+
+	if absF >= 1000000 {
+		return fmt.Sprintf("%s$%.2fM", sign, absF/1000000)
+	} else if absF >= 1000 {
+		return fmt.Sprintf("%s$%.2fK", sign, absF/1000)
+	}
+	return fmt.Sprintf("%s$%.2f", sign, absF)
+}
+
+func formatPercentage(value string) string {
+	f, err := strconv.ParseFloat(value, 64)
+	if err != nil {
+		return value
+	}
+
+	sign := ""
+	if f > 0 {
+		sign = "+"
+	}
+
+	return fmt.Sprintf("%s%.2f%%", sign, f*100)
+}
+
+func getPNLClass(value string) string {
+	f, err := strconv.ParseFloat(value, 64)
+	if err != nil {
+		return ""
+	}
+
+	if f > 0 {
+		return "text-green-600 font-medium"
+	} else if f < 0 {
+		return "text-red-600 font-medium"
+	}
+	return "text-muted-foreground"
+}
+
+func getROIClass(value string) string {
+	f, err := strconv.ParseFloat(value, 64)
+	if err != nil {
+		return ""
+	}
+
+	if f > 0 {
+		return "text-green-600 font-medium"
+	} else if f < 0 {
+		return "text-red-600 font-medium"
+	}
+	return "text-muted-foreground"
+}
+
+func formatLastRefresh(t time.Time) string {
+	now := time.Now()
+	duration := now.Sub(t)
+
+	if duration < time.Minute {
+		return "last updated just now"
+	} else if duration < time.Hour {
+		minutes := int(duration.Minutes())
+		if minutes == 1 {
+			return "last updated 1 minute ago"
+		}
+		return fmt.Sprintf("last updated %d minutes ago", minutes)
+	} else if duration < 24*time.Hour {
+		hours := int(duration.Hours())
+		if hours == 1 {
+			return "last updated 1 hour ago"
+		}
+		return fmt.Sprintf("last updated %d hours ago", hours)
+	}
+
+	return fmt.Sprintf("last updated on %s", t.Format("Jan 2, 15:04"))
+}
+
