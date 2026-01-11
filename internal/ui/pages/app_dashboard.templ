@@ -2,70 +2,152 @@ package pages
 
 import (
 	"fmt"
+	"time"
+
+	"github.com/jkeddari/hypermetrics/internal/model"
 	"github.com/jkeddari/hypermetrics/internal/ui/components/button"
 	"github.com/jkeddari/hypermetrics/internal/ui/components/card"
 	"github.com/jkeddari/hypermetrics/internal/ui/layouts"
+	"github.com/jkeddari/hypermetrics/internal/utils"
 )
 
-templ Dashboard() {
+templ Dashboard(data *model.DashboardData) {
 	@layouts.App("Dashboard") {
 		<div class="container max-w-7xl px-6 py-8">
 			<div class="mb-8">
 				<h1 class="text-3xl font-bold">Dashboard</h1>
 				<p class="text-muted-foreground mt-2">Welcome to your dashboard</p>
 			</div>
-			<!-- Stats Grid -->
-			<div class="grid gap-4 md:grid-cols-3 mb-8">
-				<!-- Total Goals -->
-				@card.Card() {
-					@card.Header() {
-						@card.Title(card.TitleProps{Class: "text-sm font-medium"}) {
-							Total open interest
-						}
-					}
-					@card.Content() {
-						<div class="text-2xl font-bold">{ fmt.Sprintf("%d", 0) }</div>
-					}
-				}
-				<!-- Active Goals -->
-				@card.Card() {
-					@card.Header() {
-						@card.Title(card.TitleProps{Class: "text-sm font-medium"}) {
-							Daily volumes
-						}
-					}
-					@card.Content() {
-						<div class="text-2xl font-bold text-green-600">{ fmt.Sprintf("%d", 0) }</div>
-					}
-				}
-				<!-- Completed Goals -->
-				@card.Card() {
-					@card.Header() {
-						@card.Title(card.TitleProps{Class: "text-sm font-medium"}) {
-							Funding
-						}
-					}
-					@card.Content() {
-						<div class="text-2xl font-bold text-blue-600">{ fmt.Sprintf("%d", 0) }</div>
-					}
-				}
-			</div>
-			<!-- Top symbols -->
-			<div>
-				<div class="flex items-center justify-between mb-4">
-					<h2 class="text-xl font-semibold">Top symbols</h2>
-					<a href="/app/symbols">
-						@button.Button(button.Props{Variant: button.VariantOutline, Size: button.SizeSm}) {
-							View All
-						}
-					</a>
-				</div>
-				@card.Card() {
-					@card.Content(card.ContentProps{Class: "text-center py-8"}) {
-						<p class="text-muted-foreground mb-4">Coming soon...</p>
-					}
-				}
-			</div>
+			<!-- HTMX polling container -->
+			@DashboardMetricsPartial(data)
 		</div>
 	}
+}
+
+templ DashboardMetricsPartial(data *model.DashboardData) {
+	<div id="dashboard-metrics" hx-get="/api/dashboard/metrics" hx-trigger="every 30s" hx-swap="outerHTML">
+		<!-- Stale data indicator -->
+		if data.IsStale {
+			<div class="bg-orange-100 dark:bg-orange-900/20 border-l-4 border-orange-500 text-orange-700 dark:text-orange-400 p-4 mb-6 rounded">
+				<p class="font-bold">⚠️ Data may be stale</p>
+				<p class="text-sm mt-1">Last updated: { formatTimestamp(data.LastUpdated) }</p>
+			</div>
+		}
+		<!-- Stats Grid -->
+		<div class="grid gap-4 md:grid-cols-3 mb-8">
+			<!-- Total Open Interest -->
+			@card.Card() {
+				@card.Header() {
+					@card.Title(card.TitleProps{Class: "text-sm font-medium"}) {
+						Total open interest
+					}
+				}
+				@card.Content() {
+					<div class="text-2xl font-bold">{ utils.FormatPriceCompact(data.Metrics.TotalOpenInterest) }</div>
+				}
+			}
+			<!-- Daily Volumes -->
+			@card.Card() {
+				@card.Header() {
+					@card.Title(card.TitleProps{Class: "text-sm font-medium"}) {
+						Daily volumes
+					}
+				}
+				@card.Content() {
+					<div class="text-2xl font-bold text-green-600 dark:text-green-400">{ utils.FormatPriceCompact(data.Metrics.TotalDailyVolume) }</div>
+				}
+			}
+			<!-- Alerts -->
+			@card.Card() {
+				@card.Header() {
+					@card.Title(card.TitleProps{Class: "text-sm font-medium"}) {
+						Alerts
+					}
+				}
+				@card.Content() {
+					<div class="text-2xl font-bold text-blue-600 dark:text-blue-400">{ fmt.Sprintf("%d", data.Metrics.AlertNumber) }</div>
+				}
+			}
+		</div>
+		<!-- Top symbols -->
+		<div>
+			<div class="flex items-center justify-between mb-4">
+				<h2 class="text-xl font-semibold">Top symbols</h2>
+				<a href="/app/symbols">
+					@button.Button(button.Props{Variant: button.VariantOutline, Size: button.SizeSm}) {
+						View All
+					}
+				</a>
+			</div>
+			@card.Card() {
+				@card.Content(card.ContentProps{Class: "p-0"}) {
+					<div class="overflow-x-auto">
+						<table class="w-full">
+							<thead class="border-b border-border">
+								<tr>
+									<th class="text-left py-3 px-4 text-sm font-medium text-muted-foreground">SYMBOL</th>
+									<th class="text-right py-3 px-4 text-sm font-medium text-muted-foreground">LAST PRICE</th>
+									<th class="text-right py-3 px-4 text-sm font-medium text-muted-foreground">24H CHANGE</th>
+									<th class="text-right py-3 px-4 text-sm font-medium text-muted-foreground">8H FUNDING</th>
+									<th class="text-right py-3 px-4 text-sm font-medium text-muted-foreground">VOLUME</th>
+									<th class="text-right py-3 px-4 text-sm font-medium text-muted-foreground">OPEN INTEREST</th>
+								</tr>
+							</thead>
+							<tbody>
+								if len(data.TopSymbols) == 0 {
+									<tr>
+										<td colspan="6" class="py-8 text-center text-muted-foreground">
+											No data available
+										</td>
+									</tr>
+								} else {
+									for _, symbol := range data.TopSymbols {
+										<tr class="border-b border-border hover:bg-muted/50 transition-colors">
+											<td class="py-3 px-4 font-medium">{ symbol.Name }</td>
+											<td class="py-3 px-4 text-right font-mono">{ utils.FormatPrice(symbol.Price) }</td>
+											if symbol.PriceChange24h >= 0 {
+												<td class="py-3 px-4 text-right font-mono text-sm text-green-600 dark:text-green-400">{ utils.Format24HChange(symbol.PriceChange24h, symbol.PriceChange24hPct) }</td>
+											} else {
+												<td class="py-3 px-4 text-right font-mono text-sm text-red-600 dark:text-red-400">{ utils.Format24HChange(symbol.PriceChange24h, symbol.PriceChange24hPct) }</td>
+											}
+											<td class="py-3 px-4 text-right font-mono text-sm">{ utils.FormatFundingRate(symbol.FundingRate) }</td>
+											<td class="py-3 px-4 text-right font-mono">{ utils.FormatPriceCompact(symbol.DailyVolume) }</td>
+											<td class="py-3 px-4 text-right font-mono">{ utils.FormatPriceCompact(symbol.OpenInterest) }</td>
+										</tr>
+									}
+								}
+							</tbody>
+						</table>
+					</div>
+				}
+			}
+		</div>
+	</div>
+}
+
+// formatTimestamp formats a time.Time for display
+func formatTimestamp(t time.Time) string {
+	now := time.Now()
+	diff := now.Sub(t)
+
+	if diff < time.Minute {
+		return "just now"
+	}
+	if diff < time.Hour {
+		mins := int(diff.Minutes())
+		if mins == 1 {
+			return "1 minute ago"
+		}
+		return fmt.Sprintf("%d minutes ago", mins)
+	}
+	if diff < 24*time.Hour {
+		hours := int(diff.Hours())
+		if hours == 1 {
+			return "1 hour ago"
+		}
+		return fmt.Sprintf("%d hours ago", hours)
+	}
+
+	// For older timestamps, show the actual time
+	return t.Format("Jan 2, 2006 at 3:04 PM")
 }

@@ -54,6 +54,7 @@ type App struct {
 	DocsService         *service.DocsService
 	LegalService        *service.LegalService
 	LeaderboardService  *service.LeaderboardS3Service
+	DashboardService    *service.DashboardService
 }
 
 func New(cfg *config.Config) (*App, error) {
@@ -139,6 +140,9 @@ func New(cfg *config.Config) (*App, error) {
 		return nil, fmt.Errorf("failed to initialize leaderboard service: %v", err)
 	}
 
+	// Initialize dashboard service
+	dashboardService := service.NewDashboardService()
+
 	// Create dev test user
 	if cfg.IsDevelopment() {
 		// Check if test user already exists
@@ -199,6 +203,7 @@ func New(cfg *config.Config) (*App, error) {
 		DocsService:         docsService,
 		LegalService:        legalService,
 		LeaderboardService:  leaderboardService,
+		DashboardService:    dashboardService,
 	}, nil
 }
 
