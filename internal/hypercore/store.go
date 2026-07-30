@@ -460,6 +460,86 @@ func (s *Store) ListWhalePositions(thresholdUSD float64) ([]WalletPosition, erro
 	)
 }
 
+func (s *Store) ListWalletPositionDistribution() ([]PositionDistributionBucket, error) {
+	if s == nil || s.db == nil {
+		return nil, ErrStoreUnavailable
+	}
+	rows, err := s.db.Query(`
+		WITH tiers (ordinal, group_name, minimum_amount, maximum_amount) AS (
+			VALUES
+				(1, 'shrimp',          0::float8,       250::float8),
+				(2, 'fish',          250::float8,      2500::float8),
+				(3, 'dolphin',      2500::float8,     25000::float8),
+				(4, 'apex_predator',25000::float8,    100000::float8),
+				(5, 'small_whale', 100000::float8,   1000000::float8),
+				(6, 'whale',      1000000::float8,  10000000::float8),
+				(7, 'tidal_whale',10000000::float8, 100000000::float8),
+				(8, 'leviathan', 100000000::float8,         0::float8)
+		),
+		wallet_stats AS (
+			SELECT
+				w.address,
+				GREATEST(w.account_value, 0) AS account_value,
+				count(p.symbol) AS position_count,
+				COALESCE(sum(CASE WHEN p.position_size > 0 THEN abs(p.position_value_usd) ELSE 0 END), 0) AS long_usd,
+				COALESCE(sum(CASE WHEN p.position_size < 0 THEN abs(p.position_value_usd) ELSE 0 END), 0) AS short_usd,
+				COALESCE(sum(p.unrealized_pnl), 0) AS unrealized_pnl,
+				COALESCE(sum(CASE
+					WHEN p.position_size > 0 THEN abs(p.position_value_usd)
+					WHEN p.position_size < 0 THEN -abs(p.position_value_usd)
+					ELSE 0
+				END), 0) AS net_position_usd
+			FROM wallets w
+			LEFT JOIN wallet_positions_current p ON p.wallet_address = w.address
+			GROUP BY w.address, w.account_value
+		)
+		SELECT
+			t.group_name,
+			t.minimum_amount,
+			t.maximum_amount,
+			count(ws.address),
+			count(ws.address) FILTER (WHERE ws.position_count > 0),
+			COALESCE(sum(ws.long_usd), 0),
+			COALESCE(sum(ws.short_usd), 0),
+			count(ws.address) FILTER (WHERE ws.position_count > 0 AND ws.unrealized_pnl >= 0),
+			count(ws.address) FILTER (WHERE ws.position_count > 0 AND ws.unrealized_pnl < 0),
+			count(ws.address) FILTER (WHERE ws.net_position_usd > 0),
+			count(ws.address) FILTER (WHERE ws.net_position_usd < 0)
+		FROM tiers t
+		LEFT JOIN wallet_stats ws
+			ON ws.account_value >= t.minimum_amount
+			AND (t.maximum_amount = 0 OR ws.account_value < t.maximum_amount)
+		GROUP BY t.ordinal, t.group_name, t.minimum_amount, t.maximum_amount
+		ORDER BY t.ordinal`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	buckets := make([]PositionDistributionBucket, 0, 8)
+	for rows.Next() {
+		var bucket PositionDistributionBucket
+		var longWallets, shortWallets int64
+		if err := rows.Scan(
+			&bucket.GroupName,
+			&bucket.MinimumAmount,
+			&bucket.MaximumAmount,
+			&bucket.AllAddressCount,
+			&bucket.PositionAddressCount,
+			&bucket.LongPositionUSD,
+			&bucket.ShortPositionUSD,
+			&bucket.ProfitAddressCount,
+			&bucket.LossAddressCount,
+			&longWallets,
+			&shortWallets,
+		); err != nil {
+			return nil, err
+		}
+		buckets = append(buckets, finalizePositionDistribution(bucket, longWallets, shortWallets))
+	}
+	return buckets, rows.Err()
+}
+
 func (s *Store) ListPositions() ([]WalletPosition, error) {
 	return s.listPositions(context.Background(), `ORDER BY position_value_usd DESC, wallet_address`)
 }

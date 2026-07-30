@@ -350,18 +350,25 @@ This endpoint returns current wallet distribution grouped by position size tiers
 ```json
 {
   "code": "0",
-  "msg": "success",
   "data": [
     {
-      "tier": "0-10k",
-      "address_count": 1200,
-      "long_position_value": 15200000,
-      "short_position_value": 9800000,
-      "sentiment": "bullish",
-      "profit_loss_distribution": {
-        "profit": 700,
-        "loss": 500
-      }
+      "group_name": "shrimp",
+      "all_address_count": 1200,
+      "position_address_count": 700,
+      "position_address_percent": 58.33,
+      "bias_score": 0.32,
+      "bias_remark": "bullish",
+      "minimum_amount": 0,
+      "maximum_amount": 250,
+      "long_position_usd": 15200000,
+      "short_position_usd": 9800000,
+      "long_position_usd_percent": 60.8,
+      "short_position_usd_percent": 39.2,
+      "position_usd": 25000000,
+      "profit_address_count": 420,
+      "loss_address_count": 280,
+      "profit_address_percent": 60,
+      "loss_address_percent": 40
     }
   ]
 }
@@ -369,19 +376,26 @@ This endpoint returns current wallet distribution grouped by position size tiers
 
 ### Calculation
 
-For each wallet, bucket by total absolute open position notional:
+Wallets are grouped by current account value:
 
-- `0-10k`
-- `10k-100k`
-- `100k-1m`
-- `1m-10m`
-- `10m+`
+- `shrimp`: `[0, 250)`
+- `fish`: `[250, 2,500)`
+- `dolphin`: `[2,500, 25,000)`
+- `apex_predator`: `[25,000, 100,000)`
+- `small_whale`: `[100,000, 1,000,000)`
+- `whale`: `[1,000,000, 10,000,000)`
+- `tidal_whale`: `[10,000,000, 100,000,000)`
+- `leviathan`: `[100,000,000, +∞)`; `maximum_amount` is `0`
 
-Recommended sentiment rule:
+Each wallet is counted once. Position values and unrealized PnL are aggregated across all its open positions. `bias_score` is:
 
-- `bullish` when long notional is greater than short notional
-- `bearish` when short notional is greater than long notional
-- `neutral` when they are equal or too close to classify
+```txt
+(net-long wallet count - net-short wallet count)
+/
+(net-long wallet count + net-short wallet count)
+```
+
+All percentage fields are rounded to two decimals and return `0` for an empty denominator.
 
 ---
 

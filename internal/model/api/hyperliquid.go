@@ -95,18 +95,24 @@ type WalletPositionDistributionQuery struct{}
 
 type WalletPnLDistributionQuery struct{}
 
-type DistributionBreakdown struct {
-	Profit int `json:"profit"`
-	Loss   int `json:"loss"`
-}
-
 type DistributionBucket struct {
-	Tier                   string                `json:"tier"`
-	AddressCount           int                   `json:"address_count"`
-	LongPositionValue      float64               `json:"long_position_value"`
-	ShortPositionValue     float64               `json:"short_position_value"`
-	Sentiment              string                `json:"sentiment"`
-	ProfitLossDistribution DistributionBreakdown `json:"profit_loss_distribution"`
+	GroupName               string  `json:"group_name"`
+	AllAddressCount         int64   `json:"all_address_count"`
+	PositionAddressCount    int64   `json:"position_address_count"`
+	PositionAddressPercent  float64 `json:"position_address_percent"`
+	BiasScore               float64 `json:"bias_score"`
+	BiasRemark              string  `json:"bias_remark"`
+	MinimumAmount           float64 `json:"minimum_amount"`
+	MaximumAmount           float64 `json:"maximum_amount"`
+	LongPositionUSD         float64 `json:"long_position_usd"`
+	ShortPositionUSD        float64 `json:"short_position_usd"`
+	LongPositionUSDPercent  float64 `json:"long_position_usd_percent"`
+	ShortPositionUSDPercent float64 `json:"short_position_usd_percent"`
+	PositionUSD             float64 `json:"position_usd"`
+	ProfitAddressCount      int64   `json:"profit_address_count"`
+	LossAddressCount        int64   `json:"loss_address_count"`
+	ProfitAddressPercent    float64 `json:"profit_address_percent"`
+	LossAddressPercent      float64 `json:"loss_address_percent"`
 }
 
 type LongShortAccountRatioHistoryQuery struct {

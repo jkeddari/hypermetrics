@@ -129,6 +129,26 @@ type WalletState struct {
 	Positions []WalletPosition `json:"positions"`
 }
 
+type PositionDistributionBucket struct {
+	GroupName               string
+	AllAddressCount         int64
+	PositionAddressCount    int64
+	PositionAddressPercent  float64
+	BiasScore               float64
+	BiasRemark              string
+	MinimumAmount           float64
+	MaximumAmount           float64
+	LongPositionUSD         float64
+	ShortPositionUSD        float64
+	LongPositionUSDPercent  float64
+	ShortPositionUSDPercent float64
+	PositionUSD             float64
+	ProfitAddressCount      int64
+	LossAddressCount        int64
+	ProfitAddressPercent    float64
+	LossAddressPercent      float64
+}
+
 type PriorityConfig struct {
 	WhaleThresholdUSD    float64
 	RejectedCandidateTTL time.Duration
@@ -357,6 +377,48 @@ func IsTrackableState(state WalletState, thresholdUSD float64) bool {
 		}
 	}
 	return false
+}
+
+func finalizePositionDistribution(bucket PositionDistributionBucket, longWallets, shortWallets int64) PositionDistributionBucket {
+	bucket.PositionUSD = bucket.LongPositionUSD + bucket.ShortPositionUSD
+	bucket.PositionAddressPercent = percentage(float64(bucket.PositionAddressCount), float64(bucket.AllAddressCount))
+	bucket.LongPositionUSDPercent = percentage(bucket.LongPositionUSD, bucket.PositionUSD)
+	bucket.ShortPositionUSDPercent = percentage(bucket.ShortPositionUSD, bucket.PositionUSD)
+	bucket.ProfitAddressPercent = percentage(float64(bucket.ProfitAddressCount), float64(bucket.PositionAddressCount))
+	bucket.LossAddressPercent = percentage(float64(bucket.LossAddressCount), float64(bucket.PositionAddressCount))
+
+	directionalWallets := longWallets + shortWallets
+	if directionalWallets > 0 {
+		bucket.BiasScore = round2(float64(longWallets-shortWallets) / float64(directionalWallets))
+	}
+	bucket.BiasRemark = biasRemark(bucket.BiasScore)
+	return bucket
+}
+
+func percentage(part, total float64) float64 {
+	if total == 0 {
+		return 0
+	}
+	return round2(part * 100 / total)
+}
+
+func round2(value float64) float64 {
+	return math.Round(value*100) / 100
+}
+
+func biasRemark(score float64) string {
+	switch {
+	case score <= -0.25:
+		return "bearish"
+	case score < -0.05:
+		return "slightly_bearish"
+	case score < 0.05:
+		return "indecisive"
+	case score < 0.5:
+		return "bullish"
+	default:
+		return "very_bullish"
+	}
 }
 
 func appendSource(sources []string, source string) []string {

@@ -132,6 +132,39 @@ func TestHyperliquidCurrentEndpoints(t *testing.T) {
 			t.Fatalf("unexpected envelope: %+v", envelope)
 		}
 	})
+
+	t.Run("wallet position distribution", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/api/hyperliquid/wallet/position-distribution", nil)
+		rec := httptest.NewRecorder()
+
+		handler.WalletPositionDistribution(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
+		}
+		var response struct {
+			Code string                        `json:"code"`
+			Data []apimodel.DistributionBucket `json:"data"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+			t.Fatal(err)
+		}
+		if response.Code != "0" || len(response.Data) != 8 {
+			t.Fatalf("unexpected response: %+v", response)
+		}
+		smallWhale := response.Data[4]
+		if smallWhale.GroupName != "small_whale" || smallWhale.AllAddressCount != 1 || smallWhale.LongPositionUSD != 1_200_000 {
+			t.Fatalf("unexpected small whale bucket: %+v", smallWhale)
+		}
+
+		var fields map[string]json.RawMessage
+		if err := json.Unmarshal(rec.Body.Bytes(), &fields); err != nil {
+			t.Fatal(err)
+		}
+		if len(fields) != 2 || fields["code"] == nil || fields["data"] == nil {
+			t.Fatalf("expected exact CoinGlass top-level fields, got %v", fields)
+		}
+	})
 }
 
 func TestUserPositionRefreshesAndStoresMissingWallet(t *testing.T) {

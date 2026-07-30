@@ -150,7 +150,8 @@ The MVP can support the public API surface in stages.
 
 - `GET /api/hyperliquid/wallet/position-distribution`
 - `GET /api/hyperliquid/wallet/pnl-distribution`
-- generated from periodic aggregate snapshots
+- position distribution is aggregated from current indexed wallets
+- historical/PnL distributions can add periodic aggregate snapshots when required
 
 ### Stage 6
 

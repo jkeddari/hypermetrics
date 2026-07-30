@@ -234,10 +234,21 @@ func (h *HyperliquidAPIHandler) Wallets(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *HyperliquidAPIHandler) WalletPositionDistribution(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusNotImplemented, apimodel.ResponseEnvelope[[]apimodel.DistributionBucket]{
-		Code: "1006",
-		Msg:  "hyperliquid wallet position distribution not implemented",
-		Data: nil,
+	buckets, err := h.store.ListWalletPositionDistribution()
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, apimodel.ResponseEnvelope[any]{
+			Code: "1006",
+			Msg:  "failed to load wallet position distribution",
+			Data: nil,
+		})
+		return
+	}
+	writeJSON(w, http.StatusOK, struct {
+		Code string                        `json:"code"`
+		Data []apimodel.DistributionBucket `json:"data"`
+	}{
+		Code: "0",
+		Data: mapPositionDistribution(buckets),
 	})
 }
 
@@ -370,6 +381,32 @@ func mapUserPosition(state hypercore.WalletState) apimodel.UserPositionData {
 		},
 		AssetPosition: positions,
 	}
+}
+
+func mapPositionDistribution(buckets []hypercore.PositionDistributionBucket) []apimodel.DistributionBucket {
+	out := make([]apimodel.DistributionBucket, 0, len(buckets))
+	for _, bucket := range buckets {
+		out = append(out, apimodel.DistributionBucket{
+			GroupName:               bucket.GroupName,
+			AllAddressCount:         bucket.AllAddressCount,
+			PositionAddressCount:    bucket.PositionAddressCount,
+			PositionAddressPercent:  bucket.PositionAddressPercent,
+			BiasScore:               bucket.BiasScore,
+			BiasRemark:              bucket.BiasRemark,
+			MinimumAmount:           bucket.MinimumAmount,
+			MaximumAmount:           bucket.MaximumAmount,
+			LongPositionUSD:         bucket.LongPositionUSD,
+			ShortPositionUSD:        bucket.ShortPositionUSD,
+			LongPositionUSDPercent:  bucket.LongPositionUSDPercent,
+			ShortPositionUSDPercent: bucket.ShortPositionUSDPercent,
+			PositionUSD:             bucket.PositionUSD,
+			ProfitAddressCount:      bucket.ProfitAddressCount,
+			LossAddressCount:        bucket.LossAddressCount,
+			ProfitAddressPercent:    bucket.ProfitAddressPercent,
+			LossAddressPercent:      bucket.LossAddressPercent,
+		})
+	}
+	return out
 }
 
 func mapWallets(wallets []hypercore.Wallet) []apimodel.WalletItem {

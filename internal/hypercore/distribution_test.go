@@ -1,0 +1,117 @@
+package hypercore
+
+import (
+	"testing"
+	"time"
+)
+
+func TestFinalizePositionDistribution(t *testing.T) {
+	bucket := finalizePositionDistribution(PositionDistributionBucket{
+		AllAddressCount:      4,
+		PositionAddressCount: 3,
+		LongPositionUSD:      300,
+		ShortPositionUSD:     100,
+		ProfitAddressCount:   2,
+		LossAddressCount:     1,
+	}, 2, 1)
+
+	if bucket.PositionAddressPercent != 75 {
+		t.Fatalf("expected 75%% active addresses, got %v", bucket.PositionAddressPercent)
+	}
+	if bucket.PositionUSD != 400 || bucket.LongPositionUSDPercent != 75 || bucket.ShortPositionUSDPercent != 25 {
+		t.Fatalf("unexpected position totals: %+v", bucket)
+	}
+	if bucket.ProfitAddressPercent != 66.67 || bucket.LossAddressPercent != 33.33 {
+		t.Fatalf("unexpected PnL percentages: %+v", bucket)
+	}
+	if bucket.BiasScore != 0.33 || bucket.BiasRemark != "bullish" {
+		t.Fatalf("unexpected bias: %+v", bucket)
+	}
+
+	empty := finalizePositionDistribution(PositionDistributionBucket{}, 0, 0)
+	if empty.PositionAddressPercent != 0 || empty.LongPositionUSDPercent != 0 || empty.BiasRemark != "indecisive" {
+		t.Fatalf("expected zero-safe empty bucket, got %+v", empty)
+	}
+}
+
+func TestListWalletPositionDistribution(t *testing.T) {
+	now := time.Date(2026, 7, 30, 12, 0, 0, 0, time.UTC)
+	cfg := PriorityConfig{Now: func() time.Time { return now }}
+	store := openTestStore(t, cfg)
+
+	saveDistributionWallet(t, store, cfg, "0x0000000000000000000000000000000000000101", 100, nil)
+	saveDistributionWallet(t, store, cfg, "0x0000000000000000000000000000000000000102", 249.99, []WalletPosition{
+		{Symbol: "BTC", PositionSize: 1, PositionValueUSD: 100, UnrealizedPnL: 10},
+	})
+	saveDistributionWallet(t, store, cfg, "0x0000000000000000000000000000000000000103", 250, []WalletPosition{
+		{Symbol: "ETH", PositionSize: -1, PositionValueUSD: 500, UnrealizedPnL: -20},
+	})
+	saveDistributionWallet(t, store, cfg, "0x0000000000000000000000000000000000000104", 1_000_000, []WalletPosition{
+		{Symbol: "BTC", PositionSize: 1, PositionValueUSD: 600, UnrealizedPnL: 20},
+		{Symbol: "ETH", PositionSize: -1, PositionValueUSD: 100, UnrealizedPnL: -5},
+	})
+	saveDistributionWallet(t, store, cfg, "0x0000000000000000000000000000000000000105", 100_000_000, nil)
+
+	buckets, err := store.ListWalletPositionDistribution()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(buckets) != 8 {
+		t.Fatalf("expected 8 stable buckets, got %d", len(buckets))
+	}
+
+	shrimp := buckets[0]
+	if shrimp.GroupName != "shrimp" || shrimp.AllAddressCount != 2 || shrimp.PositionAddressCount != 1 {
+		t.Fatalf("unexpected shrimp bucket: %+v", shrimp)
+	}
+	if shrimp.PositionAddressPercent != 50 || shrimp.LongPositionUSD != 100 || shrimp.ProfitAddressCount != 1 {
+		t.Fatalf("unexpected shrimp metrics: %+v", shrimp)
+	}
+
+	fish := buckets[1]
+	if fish.MinimumAmount != 250 || fish.AllAddressCount != 1 || fish.ShortPositionUSD != 500 || fish.BiasRemark != "bearish" {
+		t.Fatalf("expected boundary wallet in fish bucket, got %+v", fish)
+	}
+
+	whale := buckets[5]
+	if whale.AllAddressCount != 1 || whale.PositionAddressCount != 1 || whale.PositionUSD != 700 {
+		t.Fatalf("expected multi-position wallet to count once, got %+v", whale)
+	}
+
+	leviathan := buckets[7]
+	if leviathan.MinimumAmount != 100_000_000 || leviathan.MaximumAmount != 0 || leviathan.AllAddressCount != 1 {
+		t.Fatalf("unexpected unbounded leviathan bucket: %+v", leviathan)
+	}
+}
+
+func saveDistributionWallet(
+	t *testing.T,
+	store *Store,
+	cfg PriorityConfig,
+	address string,
+	accountValue float64,
+	positions []WalletPosition,
+) {
+	t.Helper()
+	now := cfg.now()
+	for i := range positions {
+		positions[i].Address = address
+		positions[i].RefreshedAt = now
+	}
+	state := WalletState{
+		Account: WalletAccount{
+			Address:       address,
+			AccountValue:  accountValue,
+			RefreshedAt:   now,
+			RawReceivedAt: now,
+		},
+		Positions: positions,
+	}
+	wallet := ApplyRefreshSuccess(Wallet{
+		Address:     address,
+		FirstSeenAt: now,
+	}, state, cfg)
+	if err := store.SaveWalletState(wallet, state); err != nil {
+		t.Fatal(err)
+	}
+}
