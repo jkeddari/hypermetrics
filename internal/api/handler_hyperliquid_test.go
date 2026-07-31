@@ -165,6 +165,63 @@ func TestHyperliquidCurrentEndpoints(t *testing.T) {
 			t.Fatalf("expected exact CoinGlass top-level fields, got %v", fields)
 		}
 	})
+
+	t.Run("wallet pnl distribution", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/api/hyperliquid/wallet/pnl-distribution", nil)
+		rec := httptest.NewRecorder()
+
+		handler.WalletPnLDistribution(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
+		}
+		var response struct {
+			Code string                        `json:"code"`
+			Data []apimodel.DistributionBucket `json:"data"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+			t.Fatal(err)
+		}
+		if response.Code != "0" || len(response.Data) != 8 || response.Data[0].GroupName != "money_printer" {
+			t.Fatalf("unexpected response: %+v", response)
+		}
+	})
+
+	t.Run("whale alerts", func(t *testing.T) {
+		alertAt := now.Add(time.Minute)
+		storedWallet, err := store.GetWallet(user)
+		if err != nil {
+			t.Fatal(err)
+		}
+		closedState := hypercore.WalletState{Account: hypercore.WalletAccount{
+			Address: user, AccountValue: 500_000, RefreshedAt: alertAt, RawReceivedAt: alertAt,
+		}}
+		storedWallet = hypercore.ApplyRefreshSuccess(storedWallet, closedState, hypercore.PriorityConfig{
+			WhaleThresholdUSD: 1_000_000,
+			Now:               func() time.Time { return alertAt },
+		})
+		if err := store.SaveWalletState(storedWallet, closedState); err != nil {
+			t.Fatal(err)
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/api/hyperliquid/whale-alert", nil)
+		rec := httptest.NewRecorder()
+		handler.WhaleAlert(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
+		}
+		var response apimodel.ResponseEnvelope[[]apimodel.WhaleAlertItem]
+		if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+			t.Fatal(err)
+		}
+		if response.Code != "0" || len(response.Data) != 1 || response.Data[0].PositionAction != hypercore.WhalePositionClosed {
+			t.Fatalf("unexpected response: %+v", response)
+		}
+		if response.Data[0].CreateTime != alertAt.UnixMilli() || response.Data[0].PositionValueUSD != 1_200_000 {
+			t.Fatalf("unexpected CoinGlass alert fields: %+v", response.Data[0])
+		}
+	})
 }
 
 func TestUserPositionRefreshesAndStoresMissingWallet(t *testing.T) {

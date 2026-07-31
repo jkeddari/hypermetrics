@@ -130,6 +130,22 @@ type WalletState struct {
 	Positions []WalletPosition `json:"positions"`
 }
 
+const (
+	WhalePositionOpened int16 = 1
+	WhalePositionClosed int16 = 2
+)
+
+type WhaleAlert struct {
+	Address          string
+	Symbol           string
+	PositionSize     float64
+	EntryPrice       float64
+	LiqPrice         float64
+	PositionValueUSD float64
+	PositionAction   int16
+	CreatedAt        time.Time
+}
+
 type PositionDistributionBucket struct {
 	GroupName               string
 	AllAddressCount         int64
@@ -378,6 +394,54 @@ func IsTrackableState(state WalletState, thresholdUSD float64) bool {
 		}
 	}
 	return false
+}
+
+func detectWhaleAlerts(previous, current []WalletPosition, thresholdUSD float64, createdAt time.Time) []WhaleAlert {
+	if thresholdUSD <= 0 {
+		thresholdUSD = 1_000_000
+	}
+	previousBySymbol := make(map[string]WalletPosition, len(previous))
+	currentBySymbol := make(map[string]WalletPosition, len(current))
+	for _, position := range previous {
+		previousBySymbol[strings.ToUpper(position.Symbol)] = position
+	}
+	for _, position := range current {
+		currentBySymbol[strings.ToUpper(position.Symbol)] = position
+	}
+
+	alerts := make([]WhaleAlert, 0)
+	for symbol, oldPosition := range previousBySymbol {
+		newPosition, exists := currentBySymbol[symbol]
+		wasWhale := math.Abs(oldPosition.PositionValueUSD) >= thresholdUSD
+		isWhale := exists && math.Abs(newPosition.PositionValueUSD) >= thresholdUSD
+		sideChanged := exists && oldPosition.PositionSize*newPosition.PositionSize < 0
+		if wasWhale && (!isWhale || sideChanged) {
+			alerts = append(alerts, whaleAlertFromPosition(oldPosition, symbol, WhalePositionClosed, createdAt))
+		}
+		if isWhale && (!wasWhale || sideChanged) {
+			alerts = append(alerts, whaleAlertFromPosition(newPosition, symbol, WhalePositionOpened, createdAt))
+		}
+		delete(currentBySymbol, symbol)
+	}
+	for symbol, position := range currentBySymbol {
+		if math.Abs(position.PositionValueUSD) >= thresholdUSD {
+			alerts = append(alerts, whaleAlertFromPosition(position, symbol, WhalePositionOpened, createdAt))
+		}
+	}
+	return alerts
+}
+
+func whaleAlertFromPosition(position WalletPosition, symbol string, action int16, createdAt time.Time) WhaleAlert {
+	return WhaleAlert{
+		Address:          position.Address,
+		Symbol:           symbol,
+		PositionSize:     position.PositionSize,
+		EntryPrice:       position.EntryPrice,
+		LiqPrice:         position.LiqPrice,
+		PositionValueUSD: math.Abs(position.PositionValueUSD),
+		PositionAction:   action,
+		CreatedAt:        createdAt,
+	}
 }
 
 func finalizePositionDistribution(bucket PositionDistributionBucket, longWallets, shortWallets int64) PositionDistributionBucket {

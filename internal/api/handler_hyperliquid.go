@@ -38,10 +38,19 @@ func NewHyperliquidAPIHandler(store *hypercore.Store, refresher WalletRefresher,
 }
 
 func (h *HyperliquidAPIHandler) WhaleAlert(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusNotImplemented, apimodel.ResponseEnvelope[[]apimodel.WhaleAlertItem]{
-		Code: "1006",
-		Msg:  "hyperliquid whale alert not implemented",
-		Data: nil,
+	alerts, err := h.store.ListWhaleAlerts(200)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, apimodel.ResponseEnvelope[any]{
+			Code: "1006",
+			Msg:  "failed to load whale alerts",
+			Data: nil,
+		})
+		return
+	}
+	writeJSON(w, http.StatusOK, apimodel.ResponseEnvelope[[]apimodel.WhaleAlertItem]{
+		Code: "0",
+		Msg:  "success",
+		Data: mapWhaleAlerts(alerts),
 	})
 }
 
@@ -253,10 +262,21 @@ func (h *HyperliquidAPIHandler) WalletPositionDistribution(w http.ResponseWriter
 }
 
 func (h *HyperliquidAPIHandler) WalletPnLDistribution(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusNotImplemented, apimodel.ResponseEnvelope[[]apimodel.DistributionBucket]{
-		Code: "1006",
-		Msg:  "hyperliquid wallet pnl distribution not implemented",
-		Data: nil,
+	buckets, err := h.store.ListWalletPnLDistribution()
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, apimodel.ResponseEnvelope[any]{
+			Code: "1006",
+			Msg:  "failed to load wallet pnl distribution",
+			Data: nil,
+		})
+		return
+	}
+	writeJSON(w, http.StatusOK, struct {
+		Code string                        `json:"code"`
+		Data []apimodel.DistributionBucket `json:"data"`
+	}{
+		Code: "0",
+		Data: mapPositionDistribution(buckets),
 	})
 }
 
@@ -352,6 +372,23 @@ func mapWhalePositions(positions []hypercore.WalletPosition) []apimodel.WhalePos
 			MarginBalance:    position.MarginBalance,
 			PositionValueUSD: position.PositionValueUSD,
 			UnrealizedPnL:    position.UnrealizedPnL,
+		})
+	}
+	return items
+}
+
+func mapWhaleAlerts(alerts []hypercore.WhaleAlert) []apimodel.WhaleAlertItem {
+	items := make([]apimodel.WhaleAlertItem, 0, len(alerts))
+	for _, alert := range alerts {
+		items = append(items, apimodel.WhaleAlertItem{
+			User:             alert.Address,
+			Symbol:           alert.Symbol,
+			PositionSize:     alert.PositionSize,
+			EntryPrice:       alert.EntryPrice,
+			LiqPrice:         alert.LiqPrice,
+			PositionValueUSD: alert.PositionValueUSD,
+			PositionAction:   alert.PositionAction,
+			CreateTime:       alert.CreatedAt.UnixMilli(),
 		})
 	}
 	return items

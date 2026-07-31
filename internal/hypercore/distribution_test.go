@@ -51,6 +51,12 @@ func TestListWalletPositionDistribution(t *testing.T) {
 		{Symbol: "ETH", PositionSize: -1, PositionValueUSD: 100, UnrealizedPnL: -5},
 	})
 	saveDistributionWallet(t, store, cfg, "0x0000000000000000000000000000000000000105", 100_000_000, nil)
+	saveDistributionWallet(t, store, cfg, "0x0000000000000000000000000000000000000106", 10_000, []WalletPosition{
+		{Symbol: "BTC", PositionSize: 1, PositionValueUSD: 200_000, UnrealizedPnL: 150_000},
+	})
+	saveDistributionWallet(t, store, cfg, "0x0000000000000000000000000000000000000107", 10_000, []WalletPosition{
+		{Symbol: "ETH", PositionSize: -1, PositionValueUSD: 300_000, UnrealizedPnL: -150_000},
+	})
 
 	buckets, err := store.ListWalletPositionDistribution()
 	if err != nil {
@@ -81,6 +87,48 @@ func TestListWalletPositionDistribution(t *testing.T) {
 	leviathan := buckets[7]
 	if leviathan.MinimumAmount != 100_000_000 || leviathan.MaximumAmount != 0 || leviathan.AllAddressCount != 1 {
 		t.Fatalf("unexpected unbounded leviathan bucket: %+v", leviathan)
+	}
+}
+
+func TestListWalletPnLDistribution(t *testing.T) {
+	now := time.Date(2026, 7, 30, 12, 0, 0, 0, time.UTC)
+	cfg := PriorityConfig{Now: func() time.Time { return now }}
+	store := openTestStore(t, cfg)
+
+	saveDistributionWallet(t, store, cfg, "0x0000000000000000000000000000000000000201", 500_000, []WalletPosition{
+		{Symbol: "BTC", PositionSize: 1, PositionValueUSD: 200_000, UnrealizedPnL: 150_000},
+	})
+	saveDistributionWallet(t, store, cfg, "0x0000000000000000000000000000000000000202", 500_000, []WalletPosition{
+		{Symbol: "ETH", PositionSize: -1, PositionValueUSD: 50_000, UnrealizedPnL: 50_000},
+	})
+	saveDistributionWallet(t, store, cfg, "0x0000000000000000000000000000000000000203", 500_000, []WalletPosition{
+		{Symbol: "SOL", PositionSize: -1, PositionValueUSD: 75_000, UnrealizedPnL: -150_000},
+	})
+	saveDistributionWallet(t, store, cfg, "0x0000000000000000000000000000000000000204", 500_000, nil)
+
+	buckets, err := store.ListWalletPnLDistribution()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(buckets) != 8 {
+		t.Fatalf("expected 8 stable PnL buckets, got %d", len(buckets))
+	}
+
+	moneyPrinter := buckets[0]
+	if moneyPrinter.GroupName != "money_printer" || moneyPrinter.AllAddressCount != 1 || moneyPrinter.LongPositionUSD != 200_000 {
+		t.Fatalf("unexpected money printer bucket: %+v", moneyPrinter)
+	}
+	smartMoney := buckets[1]
+	if smartMoney.GroupName != "smart_money" || smartMoney.AllAddressCount != 1 || smartMoney.ProfitAddressCount != 1 {
+		t.Fatalf("unexpected smart money bucket: %+v", smartMoney)
+	}
+	humbleEarner := buckets[3]
+	if humbleEarner.AllAddressCount != 1 || humbleEarner.PositionAddressCount != 0 {
+		t.Fatalf("expected inactive zero-PnL wallet in humble earner: %+v", humbleEarner)
+	}
+	gigaRekt := buckets[7]
+	if gigaRekt.GroupName != "giga_rekt" || gigaRekt.AllAddressCount != 1 || gigaRekt.LossAddressCount != 1 {
+		t.Fatalf("unexpected giga rekt bucket: %+v", gigaRekt)
 	}
 }
 

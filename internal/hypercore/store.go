@@ -266,6 +266,19 @@ func (s *Store) SaveWalletState(wallet Wallet, state WalletState) error {
 	if err := lockWallet(ctx, tx, wallet.Address); err != nil {
 		return err
 	}
+	var previousRefreshedAt time.Time
+	previousPositions := []WalletPosition(nil)
+	if err := tx.QueryRowContext(ctx, `
+		SELECT refreshed_at FROM wallet_accounts_current WHERE wallet_address = $1`,
+		wallet.Address,
+	).Scan(&previousRefreshedAt); err == nil {
+		previousPositions, err = listCurrentWalletPositions(ctx, tx, wallet.Address)
+		if err != nil {
+			return err
+		}
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
 	if candidate, status, _, err := getCandidate(ctx, tx, wallet.Address); err == nil && status == candidatePending {
 		wallet = MergeWalletSignal(wallet, CandidateWalletSignal(candidate), s.cfg)
 	} else if err != nil && !errors.Is(err, ErrWalletNotFound) {
@@ -329,6 +342,21 @@ func (s *Store) SaveWalletState(wallet Wallet, state WalletState) error {
 			position.PositionValueUSD, position.UnrealizedPnL, position.RefreshedAt,
 		); err != nil {
 			return err
+		}
+	}
+	if !previousRefreshedAt.IsZero() && refreshedAt.After(previousRefreshedAt) {
+		for _, alert := range detectWhaleAlerts(previousPositions, state.Positions, s.cfg.whaleThreshold(), refreshedAt) {
+			if _, err := tx.ExecContext(ctx, `
+				INSERT INTO whale_alerts (
+					wallet_address, symbol, position_size, entry_price, liquidation_price,
+					position_value_usd, position_action, created_at
+				) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+				ON CONFLICT DO NOTHING`,
+				alert.Address, alert.Symbol, alert.PositionSize, alert.EntryPrice, alert.LiqPrice,
+				alert.PositionValueUSD, alert.PositionAction, alert.CreatedAt,
+			); err != nil {
+				return err
+			}
 		}
 	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM wallet_candidates WHERE address = $1`, wallet.Address); err != nil {
@@ -540,6 +568,113 @@ func (s *Store) ListWalletPositionDistribution() ([]PositionDistributionBucket, 
 	return buckets, rows.Err()
 }
 
+func (s *Store) ListWalletPnLDistribution() ([]PositionDistributionBucket, error) {
+	if s == nil || s.db == nil {
+		return nil, ErrStoreUnavailable
+	}
+	rows, err := s.db.Query(`
+		WITH tiers (ordinal, group_name, minimum_amount, maximum_amount) AS (
+			VALUES
+				(1, 'money_printer',   100000::float8,  1000000::float8),
+				(2, 'smart_money',       10000::float8,   100000::float8),
+				(3, 'grinder',            1000::float8,    10000::float8),
+				(4, 'humble_earner',          0::float8,     1000::float8),
+				(5, 'exit_liquidity',     -1000::float8,        0::float8),
+				(6, 'semi_rekt',          -10000::float8,    -1000::float8),
+				(7, 'full_rekt',         -100000::float8,   -10000::float8),
+				(8, 'giga_rekt',        -1000000::float8,  -100000::float8)
+		),
+		wallet_stats AS (
+			SELECT
+				w.address,
+				count(p.symbol) AS position_count,
+				COALESCE(sum(p.unrealized_pnl), 0) AS pnl,
+				COALESCE(sum(CASE WHEN p.position_size > 0 THEN abs(p.position_value_usd) ELSE 0 END), 0) AS long_usd,
+				COALESCE(sum(CASE WHEN p.position_size < 0 THEN abs(p.position_value_usd) ELSE 0 END), 0) AS short_usd,
+				COALESCE(sum(CASE
+					WHEN p.position_size > 0 THEN abs(p.position_value_usd)
+					WHEN p.position_size < 0 THEN -abs(p.position_value_usd)
+					ELSE 0
+				END), 0) AS net_position_usd
+			FROM wallets w
+			LEFT JOIN wallet_positions_current p ON p.wallet_address = w.address
+			GROUP BY w.address
+		)
+		SELECT
+			t.group_name,
+			t.minimum_amount,
+			t.maximum_amount,
+			count(ws.address),
+			count(ws.address) FILTER (WHERE ws.position_count > 0),
+			COALESCE(sum(ws.long_usd), 0),
+			COALESCE(sum(ws.short_usd), 0),
+			count(ws.address) FILTER (WHERE ws.position_count > 0 AND ws.pnl >= 0),
+			count(ws.address) FILTER (WHERE ws.position_count > 0 AND ws.pnl < 0),
+			count(ws.address) FILTER (WHERE ws.net_position_usd > 0),
+			count(ws.address) FILTER (WHERE ws.net_position_usd < 0)
+		FROM tiers t
+		LEFT JOIN wallet_stats ws ON
+			CASE t.ordinal
+				WHEN 1 THEN ws.pnl >= t.minimum_amount
+				WHEN 8 THEN ws.pnl < t.maximum_amount
+				ELSE ws.pnl >= t.minimum_amount AND ws.pnl < t.maximum_amount
+			END
+		GROUP BY t.ordinal, t.group_name, t.minimum_amount, t.maximum_amount
+		ORDER BY t.ordinal`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	buckets := make([]PositionDistributionBucket, 0, 8)
+	for rows.Next() {
+		var bucket PositionDistributionBucket
+		var longWallets, shortWallets int64
+		if err := rows.Scan(
+			&bucket.GroupName, &bucket.MinimumAmount, &bucket.MaximumAmount,
+			&bucket.AllAddressCount, &bucket.PositionAddressCount,
+			&bucket.LongPositionUSD, &bucket.ShortPositionUSD,
+			&bucket.ProfitAddressCount, &bucket.LossAddressCount,
+			&longWallets, &shortWallets,
+		); err != nil {
+			return nil, err
+		}
+		buckets = append(buckets, finalizePositionDistribution(bucket, longWallets, shortWallets))
+	}
+	return buckets, rows.Err()
+}
+
+func (s *Store) ListWhaleAlerts(limit int) ([]WhaleAlert, error) {
+	if s == nil || s.db == nil {
+		return nil, ErrStoreUnavailable
+	}
+	if limit <= 0 || limit > 200 {
+		limit = 200
+	}
+	rows, err := s.db.Query(`
+		SELECT wallet_address, symbol, position_size, entry_price, liquidation_price,
+			position_value_usd, position_action, created_at
+		FROM whale_alerts
+		ORDER BY created_at DESC, id DESC
+		LIMIT $1`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	alerts := make([]WhaleAlert, 0)
+	for rows.Next() {
+		var alert WhaleAlert
+		if err := rows.Scan(
+			&alert.Address, &alert.Symbol, &alert.PositionSize, &alert.EntryPrice,
+			&alert.LiqPrice, &alert.PositionValueUSD, &alert.PositionAction, &alert.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		alerts = append(alerts, alert)
+	}
+	return alerts, rows.Err()
+}
+
 func (s *Store) ListPositions() ([]WalletPosition, error) {
 	return s.listPositions(context.Background(), `ORDER BY position_value_usd DESC, wallet_address`)
 }
@@ -671,6 +806,31 @@ func (s *Store) listPositions(ctx context.Context, suffix string, args ...any) (
 		SELECT wallet_address, symbol, position_size, entry_price, mark_price, liquidation_price,
 			leverage, margin_balance, position_value_usd, unrealized_pnl, refreshed_at
 		FROM wallet_positions_current `+suffix, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	positions := make([]WalletPosition, 0)
+	for rows.Next() {
+		var position WalletPosition
+		if err := rows.Scan(
+			&position.Address, &position.Symbol, &position.PositionSize, &position.EntryPrice,
+			&position.MarkPrice, &position.LiqPrice, &position.Leverage, &position.MarginBalance,
+			&position.PositionValueUSD, &position.UnrealizedPnL, &position.RefreshedAt,
+		); err != nil {
+			return nil, err
+		}
+		positions = append(positions, position)
+	}
+	return positions, rows.Err()
+}
+
+func listCurrentWalletPositions(ctx context.Context, tx *sql.Tx, address string) ([]WalletPosition, error) {
+	rows, err := tx.QueryContext(ctx, `
+		SELECT wallet_address, symbol, position_size, entry_price, mark_price, liquidation_price,
+			leverage, margin_balance, position_value_usd, unrealized_pnl, refreshed_at
+		FROM wallet_positions_current
+		WHERE wallet_address = $1`, address)
 	if err != nil {
 		return nil, err
 	}

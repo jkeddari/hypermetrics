@@ -5,16 +5,12 @@ type WhaleAlertQuery struct{}
 type WhaleAlertItem struct {
 	User             string  `json:"user"`
 	Symbol           string  `json:"symbol"`
-	Side             string  `json:"side"`
-	Action           string  `json:"action"`
 	PositionSize     float64 `json:"position_size"`
 	EntryPrice       float64 `json:"entry_price"`
-	MarkPrice        float64 `json:"mark_price"`
 	LiqPrice         float64 `json:"liq_price"`
-	Leverage         float64 `json:"leverage"`
 	PositionValueUSD float64 `json:"position_value_usd"`
-	UnrealizedPnL    float64 `json:"unrealized_pnl"`
-	Time             int64   `json:"time"`
+	PositionAction   int16   `json:"position_action"`
+	CreateTime       int64   `json:"create_time"`
 }
 
 type WhalePositionQuery struct{}
