@@ -25,6 +25,9 @@ type Config struct {
 	HypercoreStatsLogInterval     time.Duration
 	HypercoreWhaleThresholdUSD    float64
 	HypercoreRejectedCandidateTTL time.Duration
+
+	S3IngestLookback     time.Duration
+	S3IngestPollInterval time.Duration
 }
 
 func Load() *Config {
@@ -46,6 +49,9 @@ func Load() *Config {
 		HypercoreStatsLogInterval:     envDuration("HYPERCORE_STATS_LOG_INTERVAL", time.Minute),
 		HypercoreWhaleThresholdUSD:    envFloat("HYPERCORE_WHALE_THRESHOLD_USD", 1_000_000),
 		HypercoreRejectedCandidateTTL: envDuration("HYPERCORE_REJECTED_CANDIDATE_TTL", 12*time.Hour),
+
+		S3IngestLookback:     envDuration("S3_INGEST_LOOKBACK", 30*24*time.Hour),
+		S3IngestPollInterval: envDuration("S3_INGEST_POLL_INTERVAL", 15*time.Minute),
 	}
 }
 

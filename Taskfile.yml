@@ -17,6 +17,12 @@ tasks:
     cmds:
       - go run ./cmd/api/main.go
 
+  ingest:s3:
+    desc: Discover wallets from Hyperliquid S3 fills
+    deps: [db:up]
+    cmds:
+      - go run ./cmd/s3ingest
+
   test:
     desc: Run unit tests
     cmds:

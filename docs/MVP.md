@@ -15,16 +15,9 @@ The product should be explicit internally that endpoints are powered by the inde
 ## Core Data Flow
 
 ```txt
-leaderboard poller
-        |
-leaderboard candidates
-        |
-validation scan
-        |
-manual wallet seeds
-        |
-        v
-wallets
+leaderboard poller -> leaderboard candidates -> validation scan --+
+Hyperliquid S3 fills -> wallet discovery --------------------------+-> wallets
+manual wallet seeds -----------------------------------------------+
         |
         v
 priority refresh queue
@@ -88,6 +81,25 @@ It provides:
 - unrealized PnL
 
 This call is rate limited and must be controlled by the refresh queue.
+
+### S3 wallet discovery
+
+`cmd/s3ingest` streams the requester-pays Hyperliquid
+`node_fills_by_block` hourly archives, extracts unique wallet addresses, and
+adds newly discovered wallets to the PostgreSQL refresh queue. Raw fills are
+not retained.
+
+The service records each object key and ETag only after its database
+transaction commits, so restarts are idempotent. It reads the latest 30 days
+by default and then polls for new hourly objects:
+
+```sh
+task ingest:s3
+```
+
+AWS credentials must be available through the standard AWS environment
+variables or credential chain. S3 transfer charges are billed to that AWS
+account.
 
 ## Rate Limit Baseline
 

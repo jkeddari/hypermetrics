@@ -15,5 +15,21 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql
 
+  s3-ingest:
+    profiles: ["ingestion"]
+    build:
+      context: .
+      dockerfile: Dockerfile.s3ingest
+    environment:
+      DATABASE_URL: postgres://hypermetrics:hypermetrics@postgres:5432/hypermetrics?sslmode=disable
+      S3_INGEST_LOOKBACK: ${S3_INGEST_LOOKBACK:-720h}
+      S3_INGEST_POLL_INTERVAL: ${S3_INGEST_POLL_INTERVAL:-15m}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
   postgres-data:

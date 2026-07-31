@@ -10,6 +10,7 @@ import (
 const (
 	SourceLeaderboard = "leaderboard"
 	SourceManual      = "manual"
+	SourceS3          = "s3"
 
 	OnDemandFreshness = 5 * time.Minute
 
