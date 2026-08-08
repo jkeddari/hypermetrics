@@ -18,11 +18,12 @@ func TestEmailSenderUsesResendAPI(t *testing.T) {
 			To      []string `json:"to"`
 			Subject string   `json:"subject"`
 			Text    string   `json:"text"`
+			HTML    string   `json:"html"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 			t.Fatal(err)
 		}
-		if payload.From != "Hypermetrics <hello@example.com>" || len(payload.To) != 1 || payload.To[0] != "trader@example.com" || payload.Subject != "Sign in" || payload.Text != "secure link" {
+		if payload.From != "Hypermetrics <hello@example.com>" || len(payload.To) != 1 || payload.To[0] != "trader@example.com" || payload.Subject != "Sign in" || payload.Text != "secure link" || payload.HTML != "<a href=\"https://example.com\">Sign in</a>" {
 			t.Fatalf("unexpected payload: %+v", payload)
 		}
 		w.WriteHeader(http.StatusOK)
@@ -32,7 +33,7 @@ func TestEmailSenderUsesResendAPI(t *testing.T) {
 	sender := NewEmailSender("re_test", "Hypermetrics <hello@example.com>", false)
 	sender.resendURL = server.URL
 	sender.httpClient = server.Client()
-	if err := sender.Send(context.Background(), "trader@example.com", "Sign in", "secure link"); err != nil {
+	if err := sender.Send(context.Background(), "trader@example.com", "Sign in", "secure link", "<a href=\"https://example.com\">Sign in</a>"); err != nil {
 		t.Fatal(err)
 	}
 }

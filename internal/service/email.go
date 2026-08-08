@@ -28,7 +28,7 @@ func NewEmailSender(apiKey, from string, devMode bool) *EmailSender {
 	}
 }
 
-func (s *EmailSender) Send(ctx context.Context, to, subject, textBody string) error {
+func (s *EmailSender) Send(ctx context.Context, to, subject, textBody string, htmlBody ...string) error {
 	if s.apiKey == "" || s.from == "" {
 		if s.devMode {
 			slog.Info("email skipped (development)", "to", to, "subject", subject, "body", textBody)
@@ -36,9 +36,13 @@ func (s *EmailSender) Send(ctx context.Context, to, subject, textBody string) er
 		}
 		return errors.New("email service is not configured")
 	}
-	body, err := json.Marshal(map[string]any{
+	payload := map[string]any{
 		"from": s.from, "to": []string{to}, "subject": subject, "text": textBody,
-	})
+	}
+	if len(htmlBody) > 0 && htmlBody[0] != "" {
+		payload["html"] = htmlBody[0]
+	}
+	body, err := json.Marshal(payload)
 	if err != nil {
 		return err
 	}

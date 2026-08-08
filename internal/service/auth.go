@@ -10,6 +10,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"html"
 	"net/http"
 	"net/mail"
 	"strconv"
@@ -169,7 +170,18 @@ func (s *AuthService) SendMagicLink(ctx context.Context, email string) error {
 	}
 	magicURL := s.appURL + "/magic-link/" + rawToken
 	body := fmt.Sprintf("Sign in to Hypermetrics:\n%s\n\nThis link expires in 15 minutes and can only be used once. If you did not request it, you can ignore this email.", magicURL)
-	if err := s.email.Send(ctx, email, "Your Hypermetrics sign-in link", body); err != nil {
+	htmlBody := fmt.Sprintf(`<!doctype html>
+<html lang="en"><body style="margin:0;background:#f6f7f9;font-family:Arial,sans-serif;color:#171717">
+  <div style="max-width:560px;margin:32px auto;background:#ffffff;padding:40px;border-radius:12px">
+    <h1 style="margin:0 0 16px;font-size:24px">Sign in to Hypermetrics</h1>
+    <p style="line-height:1.5">Use the button below to securely sign in. This link expires in 15 minutes and can only be used once.</p>
+    <p style="margin:28px 0"><a href="%[1]s" style="display:inline-block;background:#65b800;color:#ffffff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:700">Sign in to Hypermetrics</a></p>
+    <p style="line-height:1.5">If the button does not work, copy and paste this link into your browser:</p>
+    <p style="word-break:break-all"><a href="%[1]s" style="color:#3f7600">%[1]s</a></p>
+    <p style="margin:28px 0 0;color:#6b7280;font-size:13px;line-height:1.5">If you did not request this email, you can safely ignore it.</p>
+  </div>
+</body></html>`, html.EscapeString(magicURL))
+	if err := s.email.Send(ctx, email, "Your Hypermetrics sign-in link", body, htmlBody); err != nil {
 		return fmt.Errorf("%w: %v", ErrEmailDelivery, err)
 	}
 	return nil
