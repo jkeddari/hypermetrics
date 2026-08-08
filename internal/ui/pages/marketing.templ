@@ -1,0 +1,273 @@
+package pages
+
+import (
+	"github.com/jkeddari/hypermetrics/components/badge"
+	"github.com/jkeddari/hypermetrics/components/button"
+	"github.com/jkeddari/hypermetrics/components/card"
+	"github.com/jkeddari/hypermetrics/internal/model"
+)
+
+templ Marketing(loggedIn bool, subscription *model.Subscription) {
+	@base("Real-time Hyperliquid market intelligence", loggedIn) {
+		<section class="relative overflow-hidden border-b py-20 sm:py-28 lg:py-32">
+			<div class="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,var(--color-primary),transparent_34%)] opacity-10"></div>
+			<div class="container mx-auto grid max-w-7xl items-center gap-14 px-4 lg:grid-cols-[1.08fr_0.92fr]">
+				<div>
+					@badge.Badge(badge.Props{Variant: badge.VariantSecondary, Class: "mb-6"}) {
+						Real-time Hyperliquid intelligence 
+					}
+					<h1 class="max-w-4xl text-5xl font-bold leading-[1.02] tracking-tight sm:text-6xl lg:text-7xl">
+						Build at the speed of <span class="text-primary">the market.</span>
+					</h1>
+					<p class="mt-6 max-w-2xl text-lg leading-8 text-muted-foreground sm:text-xl">
+						Turn Hyperliquid whale activity, wallet positions, and market structure into clean, actionable data for your trading product or bot.
+					</p>
+					<div class="mt-9 flex flex-col gap-3 sm:flex-row">
+						if subscription.Entitled() {
+							@button.Button(button.Props{Href: "/app/dashboard", Size: button.SizeLg, Class: "h-11 w-full px-5 sm:w-auto"}) {
+								Dashboard → 
+							}
+						} else {
+							@button.Button(button.Props{Href: "/register?plan=builder", Size: button.SizeLg, Class: "h-11 w-full px-5 sm:w-auto"}) {
+								Start your 7-day trial → 
+							}
+						}
+						@button.Button(button.Props{Href: "/docs", Variant: button.VariantOutline, Size: button.SizeLg, Class: "h-11 w-full px-5 sm:w-auto"}) {
+							Explore the API 
+						}
+					</div>
+					if subscription.Entitled() {
+						<p class="mt-4 text-sm text-muted-foreground">Manage your API keys and subscription from your dashboard.</p>
+					} else {
+						<p class="mt-4 text-sm text-muted-foreground">Full API access for 7 days. Plans start at $20/month.</p>
+					}
+				</div>
+				<div class="relative mx-auto w-full max-w-xl">
+					<div class="absolute -inset-6 -z-10 rounded-3xl bg-primary/10 blur-3xl"></div>
+					<div class="overflow-hidden rounded-2xl border bg-zinc-950 text-zinc-100 shadow-2xl shadow-primary/10">
+						<div class="flex items-center justify-between border-b border-white/10 px-5 py-4 text-xs text-zinc-400">
+							<span>Live API request</span>
+							<span class="flex items-center gap-2"><span class="size-2 rounded-full bg-primary"></span>Operational</span>
+						</div>
+						<div class="overflow-x-auto p-5 font-mono text-sm leading-7 sm:p-7">
+							<p><span class="text-primary">GET</span> /api/hyperliquid/whale-alert</p>
+							<p class="text-zinc-500">HM-API-KEY: hm_live_••••••••</p>
+							<div class="my-5 h-px bg-white/10"></div>
+							<p class="text-zinc-500">200 OK</p>
+							<pre class="mt-2 text-xs leading-6 text-zinc-300 sm:text-sm">[&#123;<br/> <span class="text-emerald-400">"symbol"</span>: "BTC",<br/> <span class="text-emerald-400">"position_value_usd"</span>: 4280000,<br/> <span class="text-emerald-400">"position_action"</span>: 1<br/>&#125;]</pre>
+						</div>
+					</div>
+				</div>
+			</div>
+		</section>
+		<section class="border-b bg-muted/30 py-8">
+			<div class="container mx-auto grid max-w-7xl gap-6 px-4 sm:grid-cols-3">
+				@audience("For traders", "Surface the wallets and positioning that move markets.")
+				@audience("For bot builders", "Feed strategies with structured data instead of brittle scrapers.")
+				@audience("For product teams", "Ship market features without operating another data pipeline.")
+			</div>
+		</section>
+		<section id="product" class="scroll-mt-20 py-24 sm:py-28">
+			<div class="container mx-auto max-w-7xl px-4">
+				<div class="max-w-3xl">
+					<p class="text-sm font-semibold uppercase tracking-widest text-primary">One focused data layer</p>
+					<h2 class="mt-4 text-4xl font-bold tracking-tight sm:text-5xl">From raw market activity to useful context.</h2>
+					<p class="mt-5 text-lg leading-8 text-muted-foreground">Query the signals your product needs through a consistent JSON API, without maintaining indexers, refresh queues, or wallet discovery infrastructure.</p>
+				</div>
+				<div class="mt-14 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+					@feature("Follow whale activity", "Detect recent high-notional moves and inspect the positions behind them.")
+					@feature("Understand any wallet", "Retrieve margin summaries, open positions, leverage, liquidation levels, and unrealized PnL.")
+					@feature("Explore by market", "Find tracked positions by Hyperliquid symbol and see who is exposed to each move.")
+					@feature("Read positioning bias", "Compare long and short notional across wallet segments with useful distribution metrics.")
+					@feature("Integrate cleanly", "Use predictable JSON responses and independently revocable API credentials.")
+					@feature("Move from idea to API call", "Create a key, open the interactive documentation, and start building in minutes.")
+				</div>
+			</div>
+		</section>
+		<section class="border-y bg-zinc-950 py-20 text-zinc-100 sm:py-24">
+			<div class="container mx-auto grid max-w-7xl items-center gap-12 px-4 lg:grid-cols-2">
+				<div>
+					@badge.Badge(badge.Props{Class: "bg-primary text-primary-foreground"}) {
+						Go-powered infrastructure 
+					}
+					<h2 class="mt-5 text-4xl font-bold tracking-tight sm:text-5xl">Less overhead between the market and your strategy.</h2>
+					<p class="mt-5 max-w-2xl text-lg leading-8 text-zinc-400">Hypermetrics is built in Go for efficient concurrency, predictable performance, and a lean request path. Your application gets structured data without carrying the operational weight behind it.</p>
+				</div>
+				<div class="grid gap-4 sm:grid-cols-3 lg:grid-cols-1">
+					@performancePoint("Concurrent by design", "A Go backend built to handle many independent market-data requests efficiently.")
+					@performancePoint("Purpose-built payloads", "Focused JSON responses deliver the fields your product can act on.")
+					@performancePoint("Infrastructure included", "Wallet discovery, prioritised refreshes, and data serving live behind one API.")
+				</div>
+			</div>
+		</section>
+		<section id="pricing" class="scroll-mt-20 py-24 sm:py-28">
+			<div class="container mx-auto max-w-7xl px-4">
+				<div class="mx-auto max-w-3xl text-center">
+					<p class="text-sm font-semibold uppercase tracking-widest text-primary">Simple pricing</p>
+					<h2 class="mt-4 text-4xl font-bold tracking-tight sm:text-5xl">Start small. Scale when your traffic does.</h2>
+					<p class="mt-5 text-lg text-muted-foreground">Every plan includes the complete Hypermetrics API and a 7-day free trial. Choose the request capacity your product needs.</p>
+				</div>
+				<div class="mx-auto mt-14 grid max-w-7xl gap-6 md:grid-cols-2 lg:grid-cols-3">
+					@pricingCard("builder", "Builder", "For prototypes, dashboards, and focused trading tools.", "$20", "60", false, false, subscription)
+					@pricingCard("pro", "Pro", "For production bots and products with sustained traffic.", "$99", "600", true, false, subscription)
+					@pricingCard("enterprise", "Enterprise", "For teams with custom throughput and support requirements.", "On request", "Custom", false, true, subscription)
+				</div>
+				<p class="mt-7 text-center text-sm text-muted-foreground">All prices are in USD and exclude tax. Applicable taxes are added at checkout. Billing starts after your 7-day trial.</p>
+			</div>
+		</section>
+		<section id="faq" class="scroll-mt-20 border-y bg-muted/30 py-24">
+			<div class="container mx-auto grid max-w-6xl gap-12 px-4 lg:grid-cols-[0.75fr_1.25fr]">
+				<div>
+					<p class="text-sm font-semibold uppercase tracking-widest text-primary">FAQ</p>
+					<h2 class="mt-4 text-4xl font-bold tracking-tight">Questions, answered.</h2>
+					<p class="mt-4 text-muted-foreground">Need endpoint-level detail? The interactive API reference shows the full request and response schemas.</p>
+					<div class="mt-7">
+						@button.Button(button.Props{Href: "/docs", Variant: button.VariantOutline}) {
+							Read the documentation 
+						}
+					</div>
+				</div>
+				<div class="space-y-3">
+					@faq("What data can I access?", "Hypermetrics covers whale alerts, high-notional positions, wallet margin and position data, tracked wallets, positions by symbol, and long/short and PnL distribution metrics.")
+					@faq("How fresh is the data?", "The refresh system prioritises active and high-value wallets so the most relevant market activity is updated first. Wallet records expose refresh metadata when you need to evaluate freshness.")
+					@faq("Which plan is right for me?", "Builder includes 60 requests per minute for focused tools, while Pro raises that limit to 600 for higher-throughput applications. Enterprise offers custom capacity and priority support for larger teams.")
+					@faq("How does the 7-day trial work?", "Your trial includes the full feature set and request limit of the plan you choose. Paid billing begins after seven days.")
+					@faq("How do I authenticate requests?", "Create an account, generate a revocable key in your dashboard, and send it with each request in the HM-API-KEY header.")
+					@faq("Why is Hypermetrics built in Go?", "Go gives the backend a small runtime footprint and efficient concurrency model, making it a strong fit for a fast, predictable market-data API.")
+				</div>
+			</div>
+		</section>
+		if !subscription.Entitled() {
+			<section class="py-24 sm:py-28">
+				<div class="container mx-auto max-w-5xl px-4">
+					<div class="overflow-hidden rounded-3xl bg-primary px-6 py-14 text-center text-primary-foreground sm:px-12">
+						<h2 class="text-4xl font-bold tracking-tight">Stop building data plumbing.<br/>Start building your edge.</h2>
+						<p class="mx-auto mt-5 max-w-2xl text-lg opacity-80">Get clean Hyperliquid intelligence into your bot, dashboard, or product today.</p>
+						<div class="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+							@button.Button(button.Props{Href: "/register?plan=builder", Size: button.SizeLg, Variant: button.VariantSecondary, Class: "h-11 px-5"}) {
+								Start your free trial 
+							}
+							@button.Button(button.Props{Href: "/docs", Size: button.SizeLg, Variant: button.VariantOutline, Class: "h-11 border-primary-foreground/30 bg-transparent px-5 text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground"}) {
+								View API reference 
+							}
+						</div>
+					</div>
+				</div>
+			</section>
+		}
+	}
+}
+
+templ audience(title string, description string) {
+	<div class="border-l-2 border-primary pl-4">
+		<p class="font-semibold">{ title }</p>
+		<p class="mt-1 text-sm leading-6 text-muted-foreground">{ description }</p>
+	</div>
+}
+
+templ feature(title string, description string) {
+	@card.Card(card.Props{Class: "h-full transition-shadow hover:shadow-md"}) {
+		@card.Header() {
+			<div class="mb-3 flex size-10 items-center justify-center rounded-lg bg-primary/10 text-lg font-bold text-primary">↗</div>
+			@card.Title(card.TitleProps{Class: "text-lg"}) {
+				{ title }
+			}
+			@card.Description(card.DescriptionProps{Class: "leading-6"}) {
+				{ description }
+			}
+		}
+	}
+}
+
+templ performancePoint(title string, description string) {
+	<div class="rounded-xl border border-white/10 bg-white/5 p-5">
+		<p class="flex items-center gap-3 font-semibold"><span class="flex size-6 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">✓</span>{ title }</p>
+		<p class="mt-2 pl-9 text-sm leading-6 text-zinc-400">{ description }</p>
+	</div>
+}
+
+templ pricingCard(planID string, name string, description string, price string, requestsPerMinute string, featured bool, custom bool, subscription *model.Subscription) {
+	@card.Card(card.Props{Class: "relative h-full"}) {
+		@card.Header(card.HeaderProps{Class: "p-6 pb-0"}) {
+			if subscription.Entitled() && subscription.PlanID == planID {
+				@card.Action() {
+					@badge.Badge() {
+						Current plan 
+					}
+				}
+			} else if featured {
+				@card.Action() {
+					@badge.Badge() {
+						Most popular 
+					}
+				}
+			}
+			@card.Title(card.TitleProps{Class: "text-2xl"}) {
+				{ name }
+			}
+			@card.Description(card.DescriptionProps{Class: "max-w-sm leading-6 md:min-h-12"}) {
+				{ description }
+			}
+		}
+		@card.Content(card.ContentProps{Class: "flex flex-1 flex-col p-6 pt-2"}) {
+			<p>
+				<span class="text-5xl font-bold tracking-tight">{ price }</span>
+				if !custom {
+					<span class="text-muted-foreground">/ month</span>
+				}
+			</p>
+			<div class="mt-7 rounded-xl bg-muted p-4">
+				<p class="text-sm text-muted-foreground">API rate limit</p>
+				<p class="mt-1 text-2xl font-bold">
+					{ requestsPerMinute }
+					if !custom {
+						<span class="text-sm font-normal text-muted-foreground">requests / minute</span>
+					}
+				</p>
+			</div>
+			<ul class="mt-7 space-y-3 text-sm">
+				<li class="flex gap-3"><span class="font-bold text-primary">✓</span> Complete Hypermetrics API access</li>
+				<li class="flex gap-3"><span class="font-bold text-primary">✓</span> Three revocable API keys</li>
+				<li class="flex gap-3"><span class="font-bold text-primary">✓</span> Interactive API documentation</li>
+				<li class="flex gap-3"><span class="font-bold text-primary">✓</span> 7-day free trial</li>
+				if custom {
+					<li class="flex gap-3"><span class="font-bold text-primary">✓</span> Priority support</li>
+				}
+			</ul>
+			<div class="mt-auto pt-8">
+				if subscription.Entitled() && subscription.PlanID == planID {
+					@button.Button(button.Props{Class: "h-10 w-full", Disabled: true}) {
+						Current plan 
+					}
+				} else if custom {
+					@button.Button(button.Props{Href: "/register", Class: "h-10 w-full", Variant: button.VariantOutline}) {
+						Request a custom plan 
+					}
+				} else if subscription.Entitled() {
+					@button.Button(button.Props{Href: "/app/dashboard#billing", Class: "h-10 w-full", Variant: button.VariantOutline}) {
+						if subscription.PlanID == "builder" && planID == "pro" {
+							Upgrade 
+						} else {
+							Downgrade 
+						}
+					}
+				} else if featured {
+					@button.Button(button.Props{Href: "/register?plan=pro", Class: "h-10 w-full"}) {
+						Start 7-day trial 
+					}
+				} else {
+					@button.Button(button.Props{Href: "/register?plan=builder", Class: "h-10 w-full", Variant: button.VariantOutline}) {
+						Start 7-day trial 
+					}
+				}
+			</div>
+		}
+	}
+}
+
+templ faq(question string, answer string) {
+	<details class="group rounded-xl border bg-card p-5 open:shadow-sm">
+		<summary class="cursor-pointer list-none pr-8 font-semibold marker:content-none">{ question } <span class="float-right -mr-8 text-xl font-normal text-muted-foreground transition-transform group-open:rotate-45">+</span></summary>
+		<p class="mt-4 pr-6 text-sm leading-6 text-muted-foreground">{ answer }</p>
+	</details>
+}

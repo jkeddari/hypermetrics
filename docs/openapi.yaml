@@ -1,0 +1,686 @@
+openapi: 3.1.0
+info:
+  title: Hypermetrics API
+  version: 1.0.0
+  summary: Hyperliquid market and wallet data for builders
+  description: |
+    Query whale activity, wallet positions and aggregate Hyperliquid market data.
+
+    ## Authentication
+
+    Every request requires an active API key in the `HM-API-KEY` header. Create up
+    to three keys from the Hypermetrics dashboard. A newly created secret is shown
+    only once and can be revoked independently.
+
+    ## Response format
+
+    Successful responses use code `0`. Errors include a stable application code
+    and a human-readable message. Timestamps are Unix milliseconds in UTC.
+  contact:
+    name: Hypermetrics support
+    url: https://hypermetrics.dev
+  license:
+    name: Proprietary
+    url: https://hypermetrics.dev
+servers:
+  - url: https://api.hypermetrics.dev
+    description: Configured API server
+security:
+  - ApiKeyAuth: []
+tags:
+  - name: Whales
+    description: Whale alerts and large open positions.
+  - name: Positions
+    description: Market and wallet position data.
+  - name: Wallets
+    description: Tracked wallets and aggregate distributions.
+paths:
+  /api/hyperliquid/whale-alert:
+    get:
+      operationId: listWhaleAlerts
+      tags: [Whales]
+      summary: List recent whale alerts
+      description: Returns the latest detected whale position events, capped at 200 results.
+      responses:
+        "200":
+          description: Whale alerts loaded successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WhaleAlertsResponse"
+              example:
+                code: "0"
+                msg: success
+                data:
+                  - user: "0x1234567890abcdef1234567890abcdef12345678"
+                    symbol: BTC
+                    position_size: 4.25
+                    entry_price: 114250.5
+                    liq_price: 92110.2
+                    position_value_usd: 487901.44
+                    position_action: 1
+                    create_time: 1785960000000
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      x-codeSamples:
+        - lang: Shell
+          label: cURL
+          source: |
+            curl --request GET \
+              --url 'https://api.hypermetrics.dev/api/hyperliquid/whale-alert' \
+              --header 'HM-API-KEY: hm_live_your_key'
+
+  /api/hyperliquid/whale-position:
+    get:
+      operationId: listWhalePositions
+      tags: [Whales]
+      summary: List current whale positions
+      description: Returns open positions above the whale threshold configured by Hypermetrics.
+      responses:
+        "200":
+          description: Whale positions loaded successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WhalePositionsResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      x-codeSamples:
+        - lang: Shell
+          label: cURL
+          source: |
+            curl --request GET \
+              --url 'https://api.hypermetrics.dev/api/hyperliquid/whale-position' \
+              --header 'HM-API-KEY: hm_live_your_key'
+
+  /api/hyperliquid/position:
+    get:
+      operationId: listPositionsBySymbol
+      tags: [Positions]
+      summary: List positions by market
+      description: Returns a page of wallet positions for one Hyperliquid symbol. Each page contains up to 100 positions.
+      parameters:
+        - $ref: "#/components/parameters/Symbol"
+        - $ref: "#/components/parameters/CurrentPage"
+      responses:
+        "200":
+          description: Positions loaded successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PositionsResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      x-codeSamples:
+        - lang: Shell
+          label: cURL
+          source: |
+            curl --request GET \
+              --url 'https://api.hypermetrics.dev/api/hyperliquid/position?symbol=BTC&current_page=1' \
+              --header 'HM-API-KEY: hm_live_your_key'
+
+  /api/hyperliquid/user-position:
+    get:
+      operationId: getUserPosition
+      tags: [Positions]
+      summary: Get a wallet position
+      description: |
+        Returns the margin summary and current open positions for one EVM address.
+        Hypermetrics refreshes missing or stale wallet data from Hyperliquid before responding.
+      parameters:
+        - name: user_address
+          in: query
+          required: true
+          description: EVM wallet address. The legacy `user` parameter is also accepted as an alias.
+          schema:
+            type: string
+            pattern: "^0x[a-fA-F0-9]{40}$"
+          example: "0x1234567890abcdef1234567890abcdef12345678"
+      responses:
+        "200":
+          description: Wallet position loaded successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserPositionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "502":
+          $ref: "#/components/responses/UpstreamUnavailable"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      x-codeSamples:
+        - lang: Shell
+          label: cURL
+          source: |
+            curl --request GET \
+              --url 'https://api.hypermetrics.dev/api/hyperliquid/user-position?user_address=0x1234567890abcdef1234567890abcdef12345678' \
+              --header 'HM-API-KEY: hm_live_your_key'
+
+  /api/hyperliquid/wallets:
+    get:
+      operationId: listWallets
+      tags: [Wallets]
+      summary: List tracked wallets
+      description: Returns wallets tracked by the Hypermetrics refresh queue, ordered by priority.
+      parameters:
+        - $ref: "#/components/parameters/CurrentPage"
+        - name: page_size
+          in: query
+          required: false
+          description: Number of wallets returned per page.
+          schema:
+            type: integer
+            minimum: 1
+            default: 100
+          example: 100
+      responses:
+        "200":
+          description: Wallets loaded successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WalletsResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      x-codeSamples:
+        - lang: Shell
+          label: cURL
+          source: |
+            curl --request GET \
+              --url 'https://api.hypermetrics.dev/api/hyperliquid/wallets?current_page=1&page_size=100' \
+              --header 'HM-API-KEY: hm_live_your_key'
+
+  /api/hyperliquid/wallet/position-distribution:
+    get:
+      operationId: getWalletPositionDistribution
+      tags: [Wallets]
+      summary: Get long and short distribution
+      description: Aggregates long and short notional values across wallet-value buckets.
+      responses:
+        "200":
+          description: Position distribution loaded successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DistributionResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      x-codeSamples:
+        - lang: Shell
+          label: cURL
+          source: |
+            curl --request GET \
+              --url 'https://api.hypermetrics.dev/api/hyperliquid/wallet/position-distribution' \
+              --header 'HM-API-KEY: hm_live_your_key'
+
+  /api/hyperliquid/wallet/pnl-distribution:
+    get:
+      operationId: getWalletPnlDistribution
+      tags: [Wallets]
+      summary: Get profit and loss distribution
+      description: Aggregates profitable and losing wallets across wallet-value buckets.
+      responses:
+        "200":
+          description: PnL distribution loaded successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DistributionResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      x-codeSamples:
+        - lang: Shell
+          label: cURL
+          source: |
+            curl --request GET \
+              --url 'https://api.hypermetrics.dev/api/hyperliquid/wallet/pnl-distribution' \
+              --header 'HM-API-KEY: hm_live_your_key'
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: HM-API-KEY
+      description: API key created from the Hypermetrics dashboard.
+
+  parameters:
+    Symbol:
+      name: symbol
+      in: query
+      required: true
+      description: Hyperliquid market symbol. Values are normalized to uppercase.
+      schema:
+        type: string
+        minLength: 1
+      example: BTC
+    CurrentPage:
+      name: current_page
+      in: query
+      required: false
+      description: One-based page number.
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+      example: 1
+
+  responses:
+    BadRequest:
+      description: A required query parameter is missing or invalid.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            missingParameter:
+              summary: Missing required parameter
+              value:
+                code: "1001"
+                msg: "missing required parameter: symbol"
+                data: null
+            invalidParameter:
+              summary: Invalid parameter
+              value:
+                code: "1002"
+                msg: "invalid parameter: current_page"
+                data: null
+    Unauthorized:
+      description: The API key is missing, invalid or revoked.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            missingKey:
+              summary: Missing API key
+              value:
+                code: "1000"
+                msg: missing api key
+                data: null
+            invalidKey:
+              summary: Invalid API key
+              value:
+                code: "1000"
+                msg: invalid api key
+                data: null
+    UpstreamUnavailable:
+      description: Hyperliquid could not be reached while refreshing wallet data.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            code: "1005"
+            msg: upstream unavailable while refreshing wallet position
+            data: null
+    InternalError:
+      description: Hypermetrics could not complete the request.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            code: "1006"
+            msg: failed to load data
+            data: null
+
+  schemas:
+    SuccessCode:
+      type: string
+      const: "0"
+      description: Stable application-level success code.
+    ErrorResponse:
+      type: object
+      required: [code, msg, data]
+      properties:
+        code:
+          type: string
+          enum: ["1000", "1001", "1002", "1005", "1006"]
+        msg:
+          type: string
+        data:
+          type: "null"
+
+    WhaleAlertsResponse:
+      type: object
+      required: [code, msg, data]
+      properties:
+        code:
+          $ref: "#/components/schemas/SuccessCode"
+        msg:
+          type: string
+          const: success
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/WhaleAlert"
+    WhalePositionsResponse:
+      type: object
+      required: [code, msg, data]
+      properties:
+        code:
+          $ref: "#/components/schemas/SuccessCode"
+        msg:
+          type: string
+          const: success
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/WhalePosition"
+    PositionsResponse:
+      type: object
+      required: [code, msg, data]
+      properties:
+        code:
+          $ref: "#/components/schemas/SuccessCode"
+        msg:
+          type: string
+          const: success
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Position"
+    UserPositionResponse:
+      type: object
+      required: [code, msg, data]
+      properties:
+        code:
+          $ref: "#/components/schemas/SuccessCode"
+        msg:
+          type: string
+          const: success
+        data:
+          $ref: "#/components/schemas/UserPosition"
+    WalletsResponse:
+      type: object
+      required: [code, msg, data]
+      properties:
+        code:
+          $ref: "#/components/schemas/SuccessCode"
+        msg:
+          type: string
+          const: success
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Wallet"
+    DistributionResponse:
+      type: object
+      description: Distribution endpoints omit the `msg` property.
+      required: [code, data]
+      properties:
+        code:
+          $ref: "#/components/schemas/SuccessCode"
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/DistributionBucket"
+
+    WhaleAlert:
+      type: object
+      required: [user, symbol, position_size, entry_price, liq_price, position_value_usd, position_action, create_time]
+      properties:
+        user:
+          $ref: "#/components/schemas/Address"
+        symbol:
+          type: string
+          example: BTC
+        position_size:
+          type: number
+          format: double
+          description: Signed asset quantity; positive is long and negative is short.
+          example: 4.25
+        entry_price:
+          $ref: "#/components/schemas/UsdAmount"
+        liq_price:
+          $ref: "#/components/schemas/UsdAmount"
+        position_value_usd:
+          $ref: "#/components/schemas/UsdAmount"
+        position_action:
+          type: integer
+          format: int32
+          description: Internal position event action code.
+          example: 1
+        create_time:
+          $ref: "#/components/schemas/UnixTimestampMilliseconds"
+
+    WhalePosition:
+      allOf:
+        - $ref: "#/components/schemas/Position"
+        - type: object
+          required: [margin_balance]
+          properties:
+            margin_balance:
+              $ref: "#/components/schemas/UsdAmount"
+    Position:
+      type: object
+      required: [user, symbol, position_size, entry_price, mark_price, liq_price, leverage, margin_balance, position_value_usd, unrealized_pnl]
+      properties:
+        user:
+          $ref: "#/components/schemas/Address"
+        symbol:
+          type: string
+          example: BTC
+        position_size:
+          type: number
+          format: double
+          description: Signed asset quantity; positive is long and negative is short.
+          example: 4.25
+        entry_price:
+          $ref: "#/components/schemas/UsdAmount"
+        mark_price:
+          $ref: "#/components/schemas/UsdAmount"
+        liq_price:
+          $ref: "#/components/schemas/UsdAmount"
+        leverage:
+          type: number
+          format: double
+          example: 5
+        margin_balance:
+          $ref: "#/components/schemas/UsdAmount"
+        position_value_usd:
+          $ref: "#/components/schemas/UsdAmount"
+        unrealized_pnl:
+          type: number
+          format: double
+          example: 18250.75
+
+    UserPosition:
+      type: object
+      required: [user, margin_summary, asset_positions]
+      properties:
+        user:
+          $ref: "#/components/schemas/Address"
+        margin_summary:
+          $ref: "#/components/schemas/MarginSummary"
+        asset_positions:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssetPosition"
+    MarginSummary:
+      type: object
+      required: [account_value, margin_used, withdrawable]
+      properties:
+        account_value:
+          $ref: "#/components/schemas/UsdAmount"
+        margin_used:
+          $ref: "#/components/schemas/UsdAmount"
+        withdrawable:
+          $ref: "#/components/schemas/UsdAmount"
+    AssetPosition:
+      type: object
+      required: [symbol, position_size, entry_price, mark_price, liq_price, leverage, position_value_usd, unrealized_pnl]
+      properties:
+        symbol:
+          type: string
+          example: ETH
+        position_size:
+          type: number
+          format: double
+          example: -12.4
+        entry_price:
+          $ref: "#/components/schemas/UsdAmount"
+        mark_price:
+          $ref: "#/components/schemas/UsdAmount"
+        liq_price:
+          $ref: "#/components/schemas/UsdAmount"
+        leverage:
+          type: number
+          format: double
+          example: 3
+        position_value_usd:
+          $ref: "#/components/schemas/UsdAmount"
+        unrealized_pnl:
+          type: number
+          format: double
+          example: -812.25
+
+    Wallet:
+      type: object
+      required: [address, sources, tier, known_whale, has_open_position, account_value, total_position_value_usd, max_position_value_usd, priority_score]
+      properties:
+        address:
+          $ref: "#/components/schemas/Address"
+        sources:
+          type: array
+          items:
+            type: string
+          example: [leaderboard, fills]
+        tier:
+          type: integer
+          example: 1
+        known_whale:
+          type: boolean
+          example: true
+        has_open_position:
+          type: boolean
+          example: true
+        account_value:
+          $ref: "#/components/schemas/UsdAmount"
+        total_position_value_usd:
+          $ref: "#/components/schemas/UsdAmount"
+        max_position_value_usd:
+          $ref: "#/components/schemas/UsdAmount"
+        last_seen_leaderboard_at:
+          $ref: "#/components/schemas/UnixTimestampMilliseconds"
+        last_refreshed_at:
+          $ref: "#/components/schemas/UnixTimestampMilliseconds"
+        next_refresh_at:
+          $ref: "#/components/schemas/UnixTimestampMilliseconds"
+        priority_score:
+          type: number
+          format: double
+          example: 87.4
+
+    DistributionBucket:
+      type: object
+      required:
+        - group_name
+        - all_address_count
+        - position_address_count
+        - position_address_percent
+        - bias_score
+        - bias_remark
+        - minimum_amount
+        - maximum_amount
+        - long_position_usd
+        - short_position_usd
+        - long_position_usd_percent
+        - short_position_usd_percent
+        - position_usd
+        - profit_address_count
+        - loss_address_count
+        - profit_address_percent
+        - loss_address_percent
+      properties:
+        group_name:
+          type: string
+          example: 1M–5M USD
+        all_address_count:
+          type: integer
+          format: int64
+          example: 312
+        position_address_count:
+          type: integer
+          format: int64
+          example: 198
+        position_address_percent:
+          type: number
+          format: double
+          example: 63.46
+        bias_score:
+          type: number
+          format: double
+          example: 18.75
+        bias_remark:
+          type: string
+          example: long
+        minimum_amount:
+          $ref: "#/components/schemas/UsdAmount"
+        maximum_amount:
+          $ref: "#/components/schemas/UsdAmount"
+        long_position_usd:
+          $ref: "#/components/schemas/UsdAmount"
+        short_position_usd:
+          $ref: "#/components/schemas/UsdAmount"
+        long_position_usd_percent:
+          type: number
+          format: double
+          example: 59.38
+        short_position_usd_percent:
+          type: number
+          format: double
+          example: 40.62
+        position_usd:
+          $ref: "#/components/schemas/UsdAmount"
+        profit_address_count:
+          type: integer
+          format: int64
+          example: 121
+        loss_address_count:
+          type: integer
+          format: int64
+          example: 77
+        profit_address_percent:
+          type: number
+          format: double
+          example: 61.11
+        loss_address_percent:
+          type: number
+          format: double
+          example: 38.89
+
+    Address:
+      type: string
+      pattern: "^0x[a-fA-F0-9]{40}$"
+      example: "0x1234567890abcdef1234567890abcdef12345678"
+    UsdAmount:
+      type: number
+      format: double
+      description: USD-denominated value.
+      example: 1250000.5
+    UnixTimestampMilliseconds:
+      type: integer
+      format: int64
+      description: Unix timestamp in milliseconds, UTC.
+      example: 1785960000000

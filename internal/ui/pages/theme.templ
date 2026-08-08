@@ -1,0 +1,17 @@
+package pages
+
+import "github.com/jkeddari/hypermetrics/components/button"
+
+templ themeToggle() {
+	@button.Button(button.Props{
+		Size:    button.SizeIcon,
+		Variant: button.VariantGhost,
+		Attributes: templ.Attributes{
+			"data-theme-toggle": "",
+			"aria-label":        "Toggle color theme",
+			"title":             "Toggle color theme",
+		},
+	}) {
+		<span aria-hidden="true">◐</span>
+	}
+}

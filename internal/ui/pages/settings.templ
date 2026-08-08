@@ -1,0 +1,126 @@
+package pages
+
+import (
+	"github.com/jkeddari/hypermetrics/components/button"
+	"github.com/jkeddari/hypermetrics/components/card"
+	"github.com/jkeddari/hypermetrics/components/input"
+	"github.com/jkeddari/hypermetrics/components/label"
+	"github.com/jkeddari/hypermetrics/internal/model"
+)
+
+templ Settings(user *model.User, csrfToken string, notice string, profileError string, passwordError string) {
+	@appLayout("Settings", user, csrfToken) {
+		<main class="container mx-auto max-w-4xl px-4 py-10">
+			<div class="mb-8">
+				<p class="text-sm font-semibold uppercase tracking-widest text-primary">Account</p>
+				<h1 class="mt-2 text-3xl font-bold">Settings</h1>
+				<p class="mt-2 text-muted-foreground">Manage your profile and sign-in credentials.</p>
+			</div>
+			if notice != "" {
+				<div role="status" class="mb-6 rounded-lg border border-primary/30 bg-primary/10 px-4 py-3 text-sm">{ notice }</div>
+			}
+			<div class="space-y-6">
+				@card.Card() {
+					@card.Header() {
+						@card.Title() {
+							Profile 
+						}
+						@card.Description() {
+							Update the name shown in your Hypermetrics account. 
+						}
+					}
+					@card.Content() {
+						if profileError != "" {
+							@formError(profileError)
+						}
+						<form action="/app/settings/profile" method="POST" class="space-y-5">
+							<input type="hidden" name="csrf_token" value={ csrfToken }/>
+							<div class="grid gap-4 sm:grid-cols-2">
+								<div class="space-y-2">
+									@label.Label(label.Props{For: "first_name"}) {
+										First name 
+									}
+									@input.Input(input.Props{ID: "first_name", Name: "first_name", Type: "text", Value: user.FirstName, Placeholder: "Jane", Attributes: templ.Attributes{"autocomplete": "given-name", "maxlength": "80"}})
+								</div>
+								<div class="space-y-2">
+									@label.Label(label.Props{For: "last_name"}) {
+										Last name 
+									}
+									@input.Input(input.Props{ID: "last_name", Name: "last_name", Type: "text", Value: user.LastName, Placeholder: "Doe", Attributes: templ.Attributes{"autocomplete": "family-name", "maxlength": "80"}})
+								</div>
+							</div>
+							<div class="space-y-2">
+								@label.Label(label.Props{For: "email"}) {
+									Email address 
+								}
+								@input.Input(input.Props{ID: "email", Type: "email", Value: user.Email, ReadOnly: true, Class: "bg-muted/50"})
+								<p class="text-xs text-muted-foreground">Email changes require a separate verification flow and are not available here.</p>
+							</div>
+							<div class="flex justify-end">
+								@button.Button(button.Props{Type: button.TypeSubmit}) {
+									Save profile 
+								}
+							</div>
+						</form>
+					}
+				}
+				@card.Card() {
+					@card.Header() {
+						@card.Title() {
+							Password 
+						}
+						if user.HasPassword() {
+							@card.Description() {
+								Enter your current password before choosing a new one. 
+							}
+						} else {
+							@card.Description() {
+								Add a password while keeping magic-link sign-in available. 
+							}
+						}
+					}
+					@card.Content() {
+						if passwordError != "" {
+							@formError(passwordError)
+						}
+						<form action="/app/settings/password" method="POST" class="space-y-5">
+							<input type="hidden" name="csrf_token" value={ csrfToken }/>
+							if user.HasPassword() {
+								<div class="space-y-2">
+									@label.Label(label.Props{For: "current_password"}) {
+										Current password 
+									}
+									@input.Input(input.Props{ID: "current_password", Name: "current_password", Type: "password", Required: true, Attributes: templ.Attributes{"autocomplete": "current-password"}})
+								</div>
+							}
+							<div class="grid gap-4 sm:grid-cols-2">
+								<div class="space-y-2">
+									@label.Label(label.Props{For: "new_password"}) {
+										New password 
+									}
+									@input.Input(input.Props{ID: "new_password", Name: "new_password", Type: "password", Required: true, Attributes: templ.Attributes{"autocomplete": "new-password", "minlength": "12", "maxlength": "72"}})
+								</div>
+								<div class="space-y-2">
+									@label.Label(label.Props{For: "confirm_password"}) {
+										Confirm new password 
+									}
+									@input.Input(input.Props{ID: "confirm_password", Name: "confirm_password", Type: "password", Required: true, Attributes: templ.Attributes{"autocomplete": "new-password", "minlength": "12", "maxlength": "72"}})
+								</div>
+							</div>
+							<p class="text-xs text-muted-foreground">Use between 12 and 72 characters.</p>
+							<div class="flex justify-end">
+								@button.Button(button.Props{Type: button.TypeSubmit}) {
+									if user.HasPassword() {
+										Change password
+									} else {
+										Set password
+									}
+								}
+							</div>
+						</form>
+					}
+				}
+			</div>
+		</main>
+	}
+}

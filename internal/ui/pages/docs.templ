@@ -1,0 +1,45 @@
+package pages
+
+templ Docs() {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1"/>
+			<meta name="description" content="Interactive Hypermetrics API reference."/>
+			<title>API Reference · Hypermetrics</title>
+			<script src="/assets/js/theme.js"></script>
+			<style>
+				.docs-controls {
+					position: fixed;
+					top: 0.75rem;
+					right: 1rem;
+					z-index: 100;
+					display: flex;
+					gap: 0.5rem;
+				}
+				.docs-control {
+					border: 1px solid #d4d4d8;
+					border-radius: 0.5rem;
+					background: #fff;
+					padding: 0.5rem 0.75rem;
+					color: #18181b;
+					font: 600 0.875rem/1 ui-sans-serif, system-ui, sans-serif;
+					text-decoration: none;
+					cursor: pointer;
+				}
+				.docs-control:hover { background: #f4f4f5; }
+				.dark .docs-control { border-color: #3f3f46; background: #18181b; color: #fafafa; }
+				.dark .docs-control:hover { background: #27272a; }
+			</style>
+		</head>
+		<body>
+			<div class="docs-controls">
+				<a class="docs-control" href="/">← Accueil</a>
+			</div>
+			<div id="app"></div>
+			<script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.64.0"></script>
+			<script src="/assets/js/docs.js"></script>
+		</body>
+	</html>
+}

@@ -18,6 +18,9 @@ go.work
 
 # Environment variables
 .env
+.env.api
+.env.web
+.env.s3-ingest
 .env.local
 .env.*.local
 
@@ -32,7 +35,6 @@ go.work
 
 # Generated files
 *_templ.go
-output.css
 
 # IDE
 .claude/

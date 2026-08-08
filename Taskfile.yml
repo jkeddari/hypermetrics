@@ -17,6 +17,27 @@ tasks:
     cmds:
       - go run ./cmd/api/main.go
 
+  generate:
+    desc: Generate server-rendered Templ components
+    cmds:
+      - go tool templ generate
+
+  css:build:
+    desc: Build Tailwind CSS
+    cmds:
+      - tailwindcss -i ./assets/css/input.css -o ./assets/css/output.css --minify
+
+  docs:lint:
+    desc: Validate the OpenAPI contract
+    cmds:
+      - docker run --rm -v "{{.ROOT_DIR}}:/spec" -w /spec redocly/cli:2.41.0 lint
+
+  dev:web:
+    desc: Start the web interface
+    deps: [db:up, generate]
+    cmds:
+      - go run ./cmd/web/main.go
+
   ingest:s3:
     desc: Discover wallets from Hyperliquid S3 fills
     deps: [db:up]
@@ -26,6 +47,7 @@ tasks:
   test:
     desc: Run unit tests
     cmds:
+      - go tool templ generate
       - go test ./...
 
   test:integration:
@@ -34,4 +56,5 @@ tasks:
     env:
       TEST_DATABASE_URL: postgres://hypermetrics:hypermetrics@localhost:5432/hypermetrics?sslmode=disable
     cmds:
+      - go tool templ generate
       - go test ./...

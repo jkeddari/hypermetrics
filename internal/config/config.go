@@ -11,13 +11,28 @@ import (
 )
 
 type Config struct {
-	APIPort string
+	AppName    string
+	AppEnv     string
+	AppURL     string
+	APIBaseURL string
+	Port       string
 
 	DatabaseURL string
 
 	SentryDSN string
 
 	APIKeys []string
+
+	SessionSecret string
+	SessionExpiry time.Duration
+
+	StripeSecretKey             string
+	StripeWebhookSecret         string
+	StripeBuilderPriceID        string
+	StripeProPriceID            string
+	StripePortalConfigurationID string
+	ResendAPIKey                string
+	ResendFromEmail             string
 
 	HypercoreRunCollectors        bool
 	HypercoreLeaderboardURL       string
@@ -30,18 +45,33 @@ type Config struct {
 	S3IngestPollInterval time.Duration
 }
 
-func Load() *Config {
-	if err := godotenv.Load(); err != nil {
-		slog.Info("no .env file found, using environment variables")
+func Load(envFile string) *Config {
+	if err := godotenv.Load(envFile); err != nil {
+		slog.Info("environment file not found, using environment variables", "file", envFile)
 	}
 
 	apiKeys := envCSV("HM_API_KEYS", nil)
 
 	return &Config{
-		APIPort:     envString("API_PORT", envString("PORT", "8080")),
+		AppName:     envString("APP_NAME", "Hypermetrics"),
+		AppEnv:      envString("APP_ENV", "development"),
+		AppURL:      envString("APP_URL", "http://localhost:3000"),
+		APIBaseURL:  envString("API_BASE_URL", "http://localhost:8080"),
+		Port:        envString("PORT", "8080"),
 		DatabaseURL: envString("DATABASE_URL", ""),
 		SentryDSN:   envString("SENTRY_DSN", ""),
 		APIKeys:     apiKeys,
+
+		SessionSecret: envString("SESSION_SECRET", "dev-only-change-me-before-production"),
+		SessionExpiry: envDuration("SESSION_EXPIRY", 7*24*time.Hour),
+
+		StripeSecretKey:             envString("STRIPE_SECRET_KEY", ""),
+		StripeWebhookSecret:         envString("STRIPE_WEBHOOK_SECRET", ""),
+		StripeBuilderPriceID:        envString("STRIPE_BUILDER_PRICE_ID", ""),
+		StripeProPriceID:            envString("STRIPE_PRO_PRICE_ID", ""),
+		StripePortalConfigurationID: envString("STRIPE_PORTAL_CONFIGURATION_ID", ""),
+		ResendAPIKey:                envString("RESEND_API_KEY", ""),
+		ResendFromEmail:             envString("RESEND_FROM_EMAIL", ""),
 
 		HypercoreRunCollectors:        envBool("HYPERCORE_RUN_COLLECTORS", true),
 		HypercoreLeaderboardURL:       envString("HYPERCORE_LEADERBOARD_URL", ""),
@@ -53,6 +83,10 @@ func Load() *Config {
 		S3IngestLookback:     envDuration("S3_INGEST_LOOKBACK", 30*24*time.Hour),
 		S3IngestPollInterval: envDuration("S3_INGEST_POLL_INTERVAL", 15*time.Minute),
 	}
+}
+
+func (c *Config) IsProduction() bool {
+	return c.AppEnv == "production"
 }
 
 func envString(key, def string) string {

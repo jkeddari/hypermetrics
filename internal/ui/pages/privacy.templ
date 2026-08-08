@@ -1,0 +1,54 @@
+package pages
+
+templ Privacy(loggedIn bool) {
+	@base("Privacy Policy", loggedIn) {
+		<article class="container mx-auto max-w-4xl space-y-8 px-4 py-12 sm:py-16">
+			<header class="space-y-2">
+				<h1 class="text-3xl font-bold tracking-tight sm:text-4xl">Privacy Policy</h1>
+				<p class="text-sm text-muted-foreground">Last updated: August 6, 2026</p>
+			</header>
+			@legalSection("Who we are") {
+				<p>Hypermetrics provides real-time Hyperliquid market intelligence through a web application and API. For privacy questions or requests, contact <a class="underline underline-offset-4 hover:text-foreground" href="mailto:contact@hypermetrics.dev">contact@hypermetrics.dev</a>.</p>
+			}
+			@legalSection("Data we collect") {
+				<ul class="list-disc space-y-2 pl-5">
+					<li>Account information, including your email address, first name, last name, password hash, and email-verification status.</li>
+					<li>Subscription and billing metadata received from Stripe, such as customer, subscription, plan, and payment status identifiers. Hypermetrics does not store your full payment-card details.</li>
+					<li>API credentials and usage data. Secret API keys are stored as hashes; we retain only the prefix needed to identify a key.</li>
+					<li>Technical logs, including request path, status, timing, and network address, used to operate and protect the service.</li>
+					<li>Public blockchain addresses and market-data parameters that you submit when using relevant API endpoints.</li>
+				</ul>
+			}
+			@legalSection("How we use your data") {
+				<ul class="list-disc space-y-2 pl-5">
+					<li>Create and secure your account, authenticate requests, and provide customer support.</li>
+					<li>Deliver the dashboard, API access, market data, and subscription features you request.</li>
+					<li>Process billing, send transactional emails, enforce rate limits, prevent abuse, and improve service reliability.</li>
+					<li>Comply with legal obligations and enforce our Terms of Service.</li>
+				</ul>
+			}
+			@legalSection("Cookies and local storage") {
+				<p>We use essential session and CSRF cookies to keep you signed in and protect forms. Your light or dark theme preference is saved in your browser's local storage. These technologies are not used for advertising.</p>
+			}
+			@legalSection("Service providers") {
+				<p>We share only the data needed to operate Hypermetrics with service providers such as Stripe for subscriptions and payments, Resend for transactional email, and our hosting, database, and infrastructure providers. We may also disclose information when required by law or to protect the service and its users. We do not sell your personal data.</p>
+			}
+			@legalSection("Retention and security") {
+				<p>We retain personal data for as long as your account is active and as needed to provide the service, resolve disputes, prevent abuse, and meet legal or accounting obligations. We apply reasonable technical and organizational safeguards, but no online service can guarantee absolute security.</p>
+			}
+			@legalSection("Your rights") {
+				<p>Depending on where you live, you may have the right to access, correct, delete, restrict, or export your personal data, or object to certain processing. Contact us to make a request. You may also have the right to complain to your local data-protection authority.</p>
+			}
+			@legalSection("Changes to this policy") {
+				<p>We may update this policy as Hypermetrics or applicable law changes. We will publish the revised version here and update the date above.</p>
+			}
+		</article>
+	}
+}
+
+templ legalSection(title string) {
+	<section class="space-y-4 rounded-2xl border bg-card p-6 text-sm leading-6 text-muted-foreground sm:p-7">
+		<h2 class="text-lg font-semibold text-foreground">{ title }</h2>
+		{ children... }
+	</section>
+}

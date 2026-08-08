@@ -24,6 +24,7 @@ func SetupRoutes(app *app.APIApp) http.Handler {
 
 	return middleware.Chain(
 		mux,
+		middleware.CORS(app.Cfg.AppURL),
 		middleware.RequestLogging,
 	)
 }

@@ -1,0 +1,59 @@
+package pages
+
+import (
+	"github.com/jkeddari/hypermetrics/components/button"
+	"github.com/jkeddari/hypermetrics/components/input"
+	"github.com/jkeddari/hypermetrics/components/label"
+)
+
+templ Login(csrfToken string, email string, errorMessage string) {
+	@authBase("Sign in") {
+		<div class="w-full max-w-md">
+			<div class="mb-10 lg:hidden">
+				@authBrand()
+			</div>
+			<p class="text-sm font-semibold uppercase tracking-[0.2em] text-primary">Secure access</p>
+			<h1 class="mt-3 text-4xl font-bold tracking-tight">Welcome back.</h1>
+			<p class="mt-3 text-muted-foreground">Sign in without a password, or use your account credentials.</p>
+			<form action="/magic-link" method="POST" class="mt-8 space-y-4">
+				<input type="hidden" name="csrf_token" value={ csrfToken }/>
+				<div class="space-y-2">
+					@label.Label(label.Props{For: "magic-email"}) {
+						Email address 
+					}
+					@input.Input(input.Props{ID: "magic-email", Name: "email", Type: "email", Value: email, Placeholder: "you@company.com", Required: true, Class: "h-11", Attributes: templ.Attributes{"autocomplete": "email"}})
+				</div>
+				@button.Button(button.Props{Type: button.TypeSubmit, Class: "h-11 w-full", Size: button.SizeLg}) {
+					Email me a secure link → 
+				}
+				<p class="text-center text-xs text-muted-foreground">New here? We'll create your account · Link expires in 15 minutes</p>
+			</form>
+			<div class="my-7 flex items-center gap-4 text-xs uppercase tracking-widest text-muted-foreground">
+				<div class="h-px flex-1 bg-border"></div><span>or use a password</span>
+				<div class="h-px flex-1 bg-border"></div>
+			</div>
+			if errorMessage != "" {
+				@formError(errorMessage)
+			}
+			<form action="/login" method="POST" class="space-y-4">
+				<input type="hidden" name="csrf_token" value={ csrfToken }/>
+				<div class="space-y-2">
+					@label.Label(label.Props{For: "password-email"}) {
+						Email address 
+					}
+					@input.Input(input.Props{ID: "password-email", Name: "email", Type: "email", Value: email, Placeholder: "you@company.com", Required: true, Class: "h-11", Attributes: templ.Attributes{"autocomplete": "email", "aria-invalid": errorMessage != ""}})
+				</div>
+				<div class="space-y-2">
+					@label.Label(label.Props{For: "password"}) {
+						Password 
+					}
+					@input.Input(input.Props{ID: "password", Name: "password", Type: "password", Required: true, Class: "h-11", Attributes: templ.Attributes{"autocomplete": "current-password", "aria-invalid": errorMessage != ""}})
+				</div>
+				@button.Button(button.Props{Type: button.TypeSubmit, Class: "h-11 w-full", Size: button.SizeLg, Variant: button.VariantOutline}) {
+					Sign in with password 
+				}
+			</form>
+			<p class="mt-8 text-center text-sm text-muted-foreground">New to Hypermetrics? <a class="font-semibold text-foreground underline decoration-primary decoration-2 underline-offset-4" href="/register">Create an account</a></p>
+		</div>
+	}
+}

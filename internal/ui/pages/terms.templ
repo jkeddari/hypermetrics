@@ -1,0 +1,47 @@
+package pages
+
+templ Terms(loggedIn bool) {
+	@base("Terms of Service", loggedIn) {
+		<article class="container mx-auto max-w-4xl space-y-8 px-4 py-12 sm:py-16">
+			<header class="space-y-2">
+				<h1 class="text-3xl font-bold tracking-tight sm:text-4xl">Terms of Service</h1>
+				<p class="text-sm text-muted-foreground">Last updated: August 6, 2026</p>
+			</header>
+			@legalSection("Agreement") {
+				<p>By creating an account or using Hypermetrics, you agree to these Terms. If you use the service for an organization, you confirm that you are authorized to accept these Terms on its behalf. If you do not agree, do not use the service.</p>
+			}
+			@legalSection("Service description") {
+				<p>Hypermetrics provides access to aggregated Hyperliquid market intelligence through a web application and API. Data may be delayed, incomplete, or inaccurate and is provided for informational purposes only. Hypermetrics does not provide financial, investment, legal, or tax advice.</p>
+			}
+			@legalSection("Accounts and API keys") {
+				<p>You must provide accurate account information and keep your credentials and API keys secure. You are responsible for activity performed through your account and must promptly revoke exposed keys or notify us of suspected unauthorized access.</p>
+			}
+			@legalSection("Subscriptions, trials, and payment") {
+				<p>Paid plans renew automatically at the interval and price shown at checkout until canceled. A trial converts to a paid subscription at its end unless canceled first. You can manage or cancel your subscription through the billing portal; cancellation takes effect at the end of the current billing period. Charges are non-refundable except where required by law.</p>
+			}
+			@legalSection("Acceptable use") {
+				<ul class="list-disc space-y-2 pl-5">
+					<li>Do not use Hypermetrics for unlawful, fraudulent, or abusive activity.</li>
+					<li>Do not bypass rate limits, probe for vulnerabilities, disrupt the service, or interfere with other users.</li>
+					<li>Do not share, resell, or expose API access except as expressly permitted by your plan or a written agreement.</li>
+					<li>Do not use data or access methods in a way that violates applicable law or third-party rights.</li>
+				</ul>
+			}
+			@legalSection("Availability and third-party data") {
+				<p>We may modify, suspend, or discontinue parts of the service and may apply reasonable usage limits. Hypermetrics depends on third-party networks, market-data sources, and service providers that we do not control, so uninterrupted or error-free availability is not guaranteed.</p>
+			}
+			@legalSection("Intellectual property") {
+				<p>Hypermetrics and its software, branding, documentation, and original content remain ours or our licensors'. These Terms grant you a limited, non-exclusive, non-transferable right to use the service while your account is active and compliant.</p>
+			}
+			@legalSection("Disclaimer and liability") {
+				<p>The service is provided "as is" and "as available." To the maximum extent permitted by law, we disclaim implied warranties and are not liable for indirect, incidental, special, consequential, or punitive damages, trading losses, lost profits, or loss of data resulting from your use of or inability to use Hypermetrics.</p>
+			}
+			@legalSection("Suspension and termination") {
+				<p>We may suspend or terminate access if you breach these Terms, create security or legal risk, or fail to pay applicable fees. You may stop using the service at any time; ending your account does not cancel amounts already due.</p>
+			}
+			@legalSection("Changes and contact") {
+				<p>We may update these Terms from time to time. Continued use after an update means you accept the revised Terms. For legal or support questions, contact <a class="underline underline-offset-4 hover:text-foreground" href="mailto:contact@hypermetrics.dev">contact@hypermetrics.dev</a>.</p>
+			}
+		</article>
+	}
+}

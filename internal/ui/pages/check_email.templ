@@ -1,0 +1,20 @@
+package pages
+
+import "github.com/jkeddari/hypermetrics/components/button"
+
+templ CheckEmail(email string, title string, description string) {
+	@authBase(title) {
+		<div class="w-full max-w-md text-center">
+			<div class="mx-auto flex size-16 items-center justify-center rounded-2xl bg-primary/10 text-3xl text-primary">✉</div>
+			<h1 class="mt-7 text-4xl font-bold tracking-tight">{ title }</h1>
+			<p class="mt-4 leading-7 text-muted-foreground">{ description }</p>
+			<p class="mt-4 rounded-xl border bg-muted/40 px-4 py-3 font-medium">{ email }</p>
+			<p class="mt-6 text-sm text-muted-foreground">The link can only be used once. Check your spam folder if it does not arrive.</p>
+			<div class="mt-8">
+				@button.Button(button.Props{Href: "/login", Variant: button.VariantOutline, Class: "w-full"}) {
+					Back to sign in 
+				}
+			</div>
+		</div>
+	}
+}

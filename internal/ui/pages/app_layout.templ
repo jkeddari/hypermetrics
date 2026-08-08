@@ -1,0 +1,52 @@
+package pages
+
+import (
+	"strings"
+
+	"github.com/jkeddari/hypermetrics/components/button"
+	"github.com/jkeddari/hypermetrics/internal/model"
+)
+
+templ appLayout(title string, user *model.User, csrfToken string) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1"/>
+			<title>{ title } · Hypermetrics</title>
+			<link rel="stylesheet" href="/assets/css/output.css"/>
+			<script src="/assets/js/theme.js"></script>
+		</head>
+		<body class="min-h-screen bg-muted/20 text-foreground antialiased">
+			<header class="border-b bg-background">
+				<div class="container mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4">
+					<a href="/" class="flex items-center gap-2 font-bold" aria-label="Hypermetrics home"><span class="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">H</span><span class="hidden sm:inline">Hypermetrics</span></a>
+					<div class="flex items-center gap-3 sm:gap-4">
+						@themeToggle()
+						<nav class="flex items-center gap-3 text-sm sm:gap-4" aria-label="Account navigation">
+							<a href="/app/dashboard" class="text-muted-foreground hover:text-foreground">Dashboard</a>
+							<a href="/app/settings" class="text-muted-foreground hover:text-foreground">Settings</a>
+							<a href="/docs" class="hidden text-muted-foreground hover:text-foreground sm:inline">Docs</a>
+						</nav>
+						<span class="hidden text-sm text-muted-foreground sm:inline">{ userDisplayName(user) }</span>
+						<form action="/logout" method="POST">
+							<input type="hidden" name="csrf_token" value={ csrfToken }/>
+							@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantOutline, Size: button.SizeSm}) {
+								Sign out 
+							}
+						</form>
+					</div>
+				</div>
+			</header>
+			{ children... }
+		</body>
+	</html>
+}
+
+func userDisplayName(user *model.User) string {
+	name := strings.TrimSpace(user.FirstName + " " + user.LastName)
+	if name != "" {
+		return name
+	}
+	return user.Email
+}
