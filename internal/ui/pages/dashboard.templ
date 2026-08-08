@@ -167,7 +167,7 @@ templ billingCard(subscription *model.Subscription, csrfToken string) {
 				<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 					<div class="text-sm text-muted-foreground">
 						<p>Status: <span class="font-medium text-foreground">{ subscription.Status }</span></p>
-						if subscription.TrialEnd != nil {
+						if subscription.Status == "trialing" && subscription.TrialEnd != nil {
 							<p>Trial ends: <span class="font-medium text-foreground">{ formatDateTime(*subscription.TrialEnd) }</span></p>
 						}
 						if subscription.CancelAtPeriodEnd {
