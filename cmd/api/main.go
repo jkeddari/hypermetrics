@@ -13,7 +13,7 @@ import (
 )
 
 func main() {
-	cfg := config.Load()
+	cfg := config.Load(".env.api")
 
 	logger.Init(cfg.SentryDSN)
 
@@ -32,10 +32,10 @@ func main() {
 	app.RunHypercoreCollectors(context.Background())
 
 	handler := api.SetupRoutes(app)
-	slog.Info("api server starting", "port", cfg.APIPort, "url", "http://localhost:"+cfg.APIPort)
+	slog.Info("api server starting", "port", cfg.Port, "url", "http://localhost:"+cfg.Port)
 
 	server := &http.Server{
-		Addr:              ":" + cfg.APIPort,
+		Addr:              ":" + cfg.Port,
 		Handler:           handler,
 		ReadHeaderTimeout: 5 * time.Second,
 		WriteTimeout:      30 * time.Second,

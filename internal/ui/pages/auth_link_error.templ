@@ -1,0 +1,18 @@
+package pages
+
+import "github.com/jkeddari/hypermetrics/components/button"
+
+templ AuthLinkError(message string) {
+	@authBase("Link unavailable") {
+		<div class="w-full max-w-md text-center">
+			<div class="mx-auto flex size-16 items-center justify-center rounded-2xl bg-destructive/10 text-2xl text-destructive">×</div>
+			<h1 class="mt-7 text-4xl font-bold tracking-tight">Link unavailable.</h1>
+			<p class="mt-4 leading-7 text-muted-foreground">{ message }</p>
+			<div class="mt-8">
+				@button.Button(button.Props{Href: "/login", Class: "w-full"}) {
+					Request a new sign-in link 
+				}
+			</div>
+		</div>
+	}
+}

@@ -1,0 +1,6 @@
+apis:
+  hypermetrics@v1:
+    root: ./docs/openapi.yaml
+
+extends:
+  - recommended

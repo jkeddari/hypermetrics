@@ -1,0 +1,235 @@
+package pages
+
+import (
+	"fmt"
+	"time"
+
+	"github.com/jkeddari/hypermetrics/components/badge"
+	"github.com/jkeddari/hypermetrics/components/button"
+	"github.com/jkeddari/hypermetrics/components/card"
+	"github.com/jkeddari/hypermetrics/components/input"
+	"github.com/jkeddari/hypermetrics/components/label"
+	"github.com/jkeddari/hypermetrics/internal/model"
+)
+
+templ Dashboard(user *model.User, subscription *model.Subscription, keys []model.APIKey, createdSecret string, csrfToken string, notice string, errorMessage string, apiBaseURL string, maxKeys int) {
+	@appLayout("Dashboard", user, csrfToken) {
+		<main class="container mx-auto max-w-6xl px-4 py-10">
+			<div class="mb-8 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+				<div>
+					if subscription.Entitled() {
+						@badge.Badge() {
+							{ planName(subscription.PlanID) } · { subscription.Status }
+						}
+					} else {
+						@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {
+							Subscription required 
+						}
+					}
+					<h1 class="mt-3 text-3xl font-bold">API keys</h1>
+					<p class="mt-2 text-muted-foreground">Create and revoke credentials for the Hypermetrics API.</p>
+				</div>
+				<div class="text-sm text-muted-foreground"><span class="font-semibold text-foreground">{ fmt.Sprintf("%d", len(keys)) }</span> / { fmt.Sprintf("%d", maxKeys) } active keys</div>
+			</div>
+			if createdSecret != "" {
+				<div class="mb-8 rounded-lg border border-primary/30 bg-primary/10 p-5">
+					<p class="font-semibold">Your new API key</p>
+					<p class="mt-1 text-sm text-muted-foreground">Copy it now. For security, the full value will not be shown again.</p>
+					<input class="mt-4 w-full rounded-md border bg-background px-3 py-2 font-mono text-sm" readonly value={ createdSecret }/>
+				</div>
+			}
+			if errorMessage != "" {
+				@formError(errorMessage)
+			}
+			if notice != "" {
+				<div class="mb-8 rounded-lg border border-primary/30 bg-primary/10 px-4 py-3 text-sm">{ notice }</div>
+			}
+			if subscription != nil && subscription.Status == "past_due" {
+				<div role="alert" class="mb-8 flex flex-col gap-4 rounded-lg border border-destructive/40 bg-destructive/10 p-5 sm:flex-row sm:items-center sm:justify-between">
+					<div>
+						<p class="font-semibold text-destructive">Payment failed</p>
+						<p class="mt-1 text-sm text-muted-foreground">Your API access remains active while Stripe retries the payment. Update your payment method now to avoid an interruption.</p>
+					</div>
+					<form action="/app/billing/portal" method="POST">
+						<input type="hidden" name="csrf_token" value={ csrfToken }/>
+						@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantOutline, Class: "shrink-0"}) {
+							Update payment method 
+						}
+					</form>
+				</div>
+			}
+			<div class="mb-6">
+				@billingCard(subscription, csrfToken)
+			</div>
+			<div class="grid gap-6 lg:grid-cols-[1fr_340px]">
+				@card.Card() {
+					@card.Header() {
+						@card.Title() {
+							Active keys 
+						}
+						@card.Description() {
+							Only the prefix is stored for display; requests are checked against a SHA-256 hash. 
+						}
+					}
+					@card.Content() {
+						if len(keys) == 0 {
+							<div class="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">No API keys yet. Create your first key to call the API.</div>
+						} else {
+							<div class="divide-y rounded-lg border">
+								for _, key := range keys {
+									<div class="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
+										<div class="min-w-0">
+											<div class="flex items-center gap-2">
+												<p class="font-medium">{ key.Name }</p>@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {
+	Active 
+}
+											</div>
+											<code class="mt-1 block text-sm text-muted-foreground">{ key.KeyPrefix }••••••••</code>
+											<p class="mt-1 text-xs text-muted-foreground">Created { formatDate(key.CreatedAt) } · Last used { formatLastUsed(key.LastUsedAt) }</p>
+										</div>
+										<form action={ templ.SafeURL("/app/api-keys/" + key.ID + "/revoke") } method="POST">
+											<input type="hidden" name="csrf_token" value={ csrfToken }/>
+											@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantOutline, Size: button.SizeSm}) {
+												Revoke 
+											}
+										</form>
+									</div>
+								}
+							</div>
+						}
+					}
+				}
+				<div class="space-y-6">
+					@card.Card() {
+						@card.Header() {
+							@card.Title() {
+								Create a key 
+							}
+							@card.Description() {
+								Use a short name that identifies the app or environment. 
+							}
+						}
+						@card.Content() {
+							<form action="/app/api-keys" method="POST" class="space-y-4">
+								<input type="hidden" name="csrf_token" value={ csrfToken }/>
+								<div class="space-y-2">
+									@label.Label(label.Props{For: "name"}) {
+										Key name 
+									}
+									@input.Input(input.Props{ID: "name", Name: "name", Type: "text", Placeholder: "Production bot", Required: true})
+								</div>
+								@button.Button(button.Props{Type: button.TypeSubmit, Class: "w-full", Disabled: len(keys) >= maxKeys || !subscription.Entitled()}) {
+									Generate key 
+								}
+							</form>
+						}
+					}
+					@card.Card() {
+						@card.Header() {
+							@card.Title() {
+								Quick request 
+							}
+						}
+						@card.Content() {
+							<p class="text-sm text-muted-foreground">Base URL</p>
+							<code class="mt-2 block break-all text-sm">{ apiBaseURL }</code>
+							<div class="mt-4">
+								@button.Button(button.Props{Href: "/docs", Variant: button.VariantOutline, Class: "w-full"}) {
+									Open documentation 
+								}
+							</div>
+						}
+					}
+				</div>
+			</div>
+		</main>
+	}
+}
+
+templ billingCard(subscription *model.Subscription, csrfToken string) {
+	@card.Card(card.Props{ID: "billing", Class: "scroll-mt-20"}) {
+		@card.Header() {
+			@card.Title() {
+				Subscription 
+			}
+			if subscription.Entitled() {
+				@card.Description() {
+					{ planName(subscription.PlanID) } · { fmt.Sprintf("%d", subscription.RateLimit()) } requests per minute 
+				}
+			} else {
+				@card.Description() {
+					Choose a plan to unlock API keys and start your 7-day trial. 
+				}
+			}
+		}
+		@card.Content() {
+			if subscription.Entitled() {
+				<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+					<div class="text-sm text-muted-foreground">
+						<p>Status: <span class="font-medium text-foreground">{ subscription.Status }</span></p>
+						if subscription.TrialEnd != nil {
+							<p>Trial ends: <span class="font-medium text-foreground">{ formatDateTime(*subscription.TrialEnd) }</span></p>
+						}
+						if subscription.CancelAtPeriodEnd {
+							if subscription.Status == "trialing" && subscription.TrialEnd != nil {
+								<p class="mt-2 font-medium text-destructive">Subscription cancelled. Access remains available until your trial ends on { formatDateTime(*subscription.TrialEnd) }. After that, the API and your API keys will no longer be available.</p>
+							} else {
+								<p class="mt-2 font-medium text-destructive">Subscription cancelled. Access remains available until the end of the current billing period.</p>
+							}
+						}
+					</div>
+					<form action="/app/billing/portal" method="POST">
+						<input type="hidden" name="csrf_token" value={ csrfToken }/>
+						@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantOutline}) {
+							Manage billing 
+						}
+					</form>
+				</div>
+			} else {
+				if subscription != nil && subscription.Status != "pending" {
+					<p class="mb-4 text-sm text-muted-foreground">Current status: <span class="font-medium text-foreground">{ subscription.Status }</span></p>
+				}
+				<div class="grid gap-3 sm:grid-cols-2">
+					@checkoutButton("builder", "Builder — $20/month", csrfToken, false)
+					@checkoutButton("pro", "Pro — $99/month", csrfToken, true)
+				</div>
+				if subscription.TrialEligible() {
+					<p class="mt-3 text-xs text-muted-foreground">Prices exclude tax. A payment method is collected now and charged after the 7-day trial unless you cancel.</p>
+				} else {
+					<p class="mt-3 text-xs text-muted-foreground">Prices exclude tax. The subscription is charged immediately because the free trial has already been used.</p>
+				}
+			}
+		}
+	}
+}
+
+templ checkoutButton(planID string, text string, csrfToken string, featured bool) {
+	<form action="/app/billing/checkout" method="POST">
+		<input type="hidden" name="csrf_token" value={ csrfToken }/>
+		<input type="hidden" name="plan" value={ planID }/>
+		if featured {
+			@button.Button(button.Props{Type: button.TypeSubmit, Class: "w-full"}) {
+				{ text }
+			}
+		} else {
+			@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantOutline, Class: "w-full"}) {
+				{ text }
+			}
+		}
+	</form>
+}
+
+func formatDate(value time.Time) string {
+	return value.UTC().Format("02 Jan 2006")
+}
+
+func formatLastUsed(value *time.Time) string {
+	if value == nil {
+		return "never"
+	}
+	return value.UTC().Format("02 Jan 2006 15:04 UTC")
+}
+
+func formatDateTime(value time.Time) string {
+	return value.UTC().Format("02 Jan 2006 15:04 UTC")
+}

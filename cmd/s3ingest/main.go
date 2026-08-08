@@ -17,7 +17,7 @@ import (
 )
 
 func main() {
-	cfg := config.Load()
+	cfg := config.Load(".env.s3-ingest")
 	logger.Init(cfg.SentryDSN)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)

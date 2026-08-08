@@ -15,6 +15,46 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql
 
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    environment:
+      PORT: 8080
+      DATABASE_URL: postgres://hypermetrics:hypermetrics@postgres:5432/hypermetrics?sslmode=disable
+      HM_API_KEYS: ${HM_API_KEYS:-}
+      HYPERCORE_RUN_COLLECTORS: ${HYPERCORE_RUN_COLLECTORS:-true}
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    environment:
+      PORT: 3000
+      APP_NAME: Hypermetrics
+      APP_ENV: ${APP_ENV:-development}
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      API_BASE_URL: ${API_BASE_URL:-http://localhost:8080}
+      SESSION_SECRET: ${SESSION_SECRET:-dev-only-change-me-before-production}
+      DATABASE_URL: postgres://hypermetrics:hypermetrics@postgres:5432/hypermetrics?sslmode=disable
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_BUILDER_PRICE_ID: ${STRIPE_BUILDER_PRICE_ID:-}
+      STRIPE_PRO_PRICE_ID: ${STRIPE_PRO_PRICE_ID:-}
+      STRIPE_PORTAL_CONFIGURATION_ID: ${STRIPE_PORTAL_CONFIGURATION_ID:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-}
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   s3-ingest:
     profiles: ["ingestion"]
     build:
