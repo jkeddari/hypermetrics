@@ -254,7 +254,16 @@ func (s *server) dashboard(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	notice := ""
 	if r.URL.Query().Get("checkout") == "success" {
-		notice = "Checkout completed. Your subscription will be available in a few seconds."
+		if s.app.BillingService != nil && r.URL.Query().Get("session_id") != "" {
+			if err := s.app.BillingService.SyncCheckoutSession(r.Context(), currentUser(r).ID, r.URL.Query().Get("session_id")); err != nil {
+				slog.Error("failed to sync Checkout session", "error", err, "user_id", currentUser(r).ID)
+				notice = "Checkout completed. We are confirming your subscription."
+			} else {
+				notice = "Checkout completed. Your subscription is now active."
+			}
+		} else {
+			notice = "Checkout completed. We are confirming your subscription."
+		}
 	}
 	s.renderDashboard(w, r, "", notice, "")
 }

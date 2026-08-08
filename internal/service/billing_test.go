@@ -44,6 +44,13 @@ func TestBillingPlanMappingAndSingleTrial(t *testing.T) {
 	}
 }
 
+func TestCheckoutSuccessURLIncludesSessionID(t *testing.T) {
+	billing := NewBillingService(nil, BillingConfig{AppURL: "https://hypermetrics.xyz"})
+	if got, want := billing.checkoutSuccessURL(), "https://hypermetrics.xyz/app/dashboard?checkout=success&session_id={CHECKOUT_SESSION_ID}"; got != want {
+		t.Fatalf("success URL = %q, want %q", got, want)
+	}
+}
+
 func TestBillingEmailUsesResendIdempotency(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != "Bearer re_test" || r.Header.Get("Idempotency-Key") != "evt_payment_failed" {

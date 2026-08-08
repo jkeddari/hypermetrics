@@ -144,7 +144,7 @@ func (s *BillingService) CreateCheckout(ctx context.Context, user *model.User, p
 		Mode:                    stripe.String("subscription"),
 		Customer:                stripe.String(customerID),
 		ClientReferenceID:       stripe.String(user.ID),
-		SuccessURL:              stripe.String(s.appURL + "/app/dashboard?checkout=success"),
+		SuccessURL:              stripe.String(s.checkoutSuccessURL()),
 		CancelURL:               stripe.String(s.appURL + "/app/dashboard?checkout=cancelled"),
 		PaymentMethodCollection: stripe.String("always"),
 		AutomaticTax:            &stripe.CheckoutSessionCreateAutomaticTaxParams{Enabled: stripe.Bool(true)},
@@ -161,6 +161,36 @@ func (s *BillingService) CreateCheckout(ctx context.Context, user *model.User, p
 		return "", fmt.Errorf("create Checkout session: %w", err)
 	}
 	return session.URL, nil
+}
+
+func (s *BillingService) SyncCheckoutSession(ctx context.Context, userID, sessionID string) error {
+	if sessionID == "" {
+		return errors.New("missing Checkout session ID")
+	}
+	session, err := s.stripe.V1CheckoutSessions.Retrieve(ctx, sessionID, nil)
+	if err != nil {
+		return fmt.Errorf("retrieve Checkout session: %w", err)
+	}
+	if session.ClientReferenceID != userID || session.Subscription == nil || string(session.Status) != "complete" {
+		return errors.New("Checkout session does not belong to the current user or is not complete")
+	}
+	sub, err := s.stripe.V1Subscriptions.Retrieve(ctx, session.Subscription.ID, nil)
+	if err != nil {
+		return fmt.Errorf("retrieve Stripe subscription: %w", err)
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, _, err := s.syncSubscription(ctx, tx, sub, time.Now().Unix()); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func (s *BillingService) checkoutSuccessURL() string {
+	return s.appURL + "/app/dashboard?checkout=success&session_id={CHECKOUT_SESSION_ID}"
 }
 
 func (s *BillingService) CreatePortal(ctx context.Context, userID string) (string, error) {
