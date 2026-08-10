@@ -18,12 +18,12 @@ info:
     and a human-readable message. Timestamps are Unix milliseconds in UTC.
   contact:
     name: Hypermetrics support
-    url: https://hypermetrics.dev
+    url: https://hypermetrics.xyz
   license:
     name: Proprietary
-    url: https://hypermetrics.dev
+    url: https://hypermetrics.xyz
 servers:
-  - url: https://api.hypermetrics.dev
+  - url: https://api.hypermetrics.xyz
     description: Configured API server
 security:
   - ApiKeyAuth: []
@@ -69,7 +69,7 @@ paths:
           label: cURL
           source: |
             curl --request GET \
-              --url 'https://api.hypermetrics.dev/api/hyperliquid/whale-alert' \
+              --url 'https://api.hypermetrics.xyz/api/hyperliquid/whale-alert' \
               --header 'HM-API-KEY: hm_live_your_key'
 
   /api/hyperliquid/whale-position:
@@ -94,7 +94,7 @@ paths:
           label: cURL
           source: |
             curl --request GET \
-              --url 'https://api.hypermetrics.dev/api/hyperliquid/whale-position' \
+              --url 'https://api.hypermetrics.xyz/api/hyperliquid/whale-position' \
               --header 'HM-API-KEY: hm_live_your_key'
 
   /api/hyperliquid/position:
@@ -124,7 +124,7 @@ paths:
           label: cURL
           source: |
             curl --request GET \
-              --url 'https://api.hypermetrics.dev/api/hyperliquid/position?symbol=BTC&current_page=1' \
+              --url 'https://api.hypermetrics.xyz/api/hyperliquid/position?symbol=BTC&current_page=1' \
               --header 'HM-API-KEY: hm_live_your_key'
 
   /api/hyperliquid/user-position:
@@ -164,7 +164,7 @@ paths:
           label: cURL
           source: |
             curl --request GET \
-              --url 'https://api.hypermetrics.dev/api/hyperliquid/user-position?user_address=0x1234567890abcdef1234567890abcdef12345678' \
+              --url 'https://api.hypermetrics.xyz/api/hyperliquid/user-position?user_address=0x1234567890abcdef1234567890abcdef12345678' \
               --header 'HM-API-KEY: hm_live_your_key'
 
   /api/hyperliquid/wallets:
@@ -202,7 +202,7 @@ paths:
           label: cURL
           source: |
             curl --request GET \
-              --url 'https://api.hypermetrics.dev/api/hyperliquid/wallets?current_page=1&page_size=100' \
+              --url 'https://api.hypermetrics.xyz/api/hyperliquid/wallets?current_page=1&page_size=100' \
               --header 'HM-API-KEY: hm_live_your_key'
 
   /api/hyperliquid/wallet/position-distribution:
@@ -227,7 +227,7 @@ paths:
           label: cURL
           source: |
             curl --request GET \
-              --url 'https://api.hypermetrics.dev/api/hyperliquid/wallet/position-distribution' \
+              --url 'https://api.hypermetrics.xyz/api/hyperliquid/wallet/position-distribution' \
               --header 'HM-API-KEY: hm_live_your_key'
 
   /api/hyperliquid/wallet/pnl-distribution:
@@ -252,7 +252,7 @@ paths:
           label: cURL
           source: |
             curl --request GET \
-              --url 'https://api.hypermetrics.dev/api/hyperliquid/wallet/pnl-distribution' \
+              --url 'https://api.hypermetrics.xyz/api/hyperliquid/wallet/pnl-distribution' \
               --header 'HM-API-KEY: hm_live_your_key'
 
 components:

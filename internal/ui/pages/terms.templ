@@ -1,7 +1,12 @@
 package pages
 
-templ Terms(loggedIn bool) {
-	@base("Terms of Service", loggedIn) {
+templ Terms(siteURL string, loggedIn bool) {
+	@base(publicSEO(
+		"Terms of Service · Hypermetrics",
+		"Review the terms governing Hypermetrics accounts, API access, trials, subscriptions, and acceptable use.",
+		siteURL,
+		"/legal/terms",
+	), loggedIn) {
 		<article class="container mx-auto max-w-4xl space-y-8 px-4 py-12 sm:py-16">
 			<header class="space-y-2">
 				<h1 class="text-3xl font-bold tracking-tight sm:text-4xl">Terms of Service</h1>
@@ -40,7 +45,7 @@ templ Terms(loggedIn bool) {
 				<p>We may suspend or terminate access if you breach these Terms, create security or legal risk, or fail to pay applicable fees. You may stop using the service at any time; ending your account does not cancel amounts already due.</p>
 			}
 			@legalSection("Changes and contact") {
-				<p>We may update these Terms from time to time. Continued use after an update means you accept the revised Terms. For legal or support questions, contact <a class="underline underline-offset-4 hover:text-foreground" href="mailto:contact@hypermetrics.dev">contact@hypermetrics.dev</a>.</p>
+				<p>We may update these Terms from time to time. Continued use after an update means you accept the revised Terms. For legal or support questions, contact <a class="underline underline-offset-4 hover:text-foreground" href="mailto:hello@hypermetrics.xyz">hello@hypermetrics.xyz</a>.</p>
 			}
 		</article>
 	}

@@ -3,7 +3,11 @@ package pages
 import "github.com/jkeddari/hypermetrics/components/button"
 
 templ NotFound(loggedIn bool) {
-	@base("Page not found", loggedIn) {
+	@base(SEO{
+		Title: "Page not found · Hypermetrics",
+		Description: "The requested Hypermetrics page does not exist.",
+		NoIndex: true,
+	}, loggedIn) {
 		<section class="flex min-h-[65vh] items-center justify-center px-4 text-center">
 			<div>
 				<p class="text-sm font-semibold text-primary">404</p>

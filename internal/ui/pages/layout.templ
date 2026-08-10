@@ -1,20 +1,99 @@
 package pages
 
 import (
+	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jkeddari/hypermetrics/components/button"
 )
 
-templ base(title string, loggedIn bool) {
+type SEO struct {
+	Title          string
+	Description    string
+	CanonicalURL   string
+	ImageURL       string
+	NoIndex        bool
+	StructuredData string
+}
+
+func publicSEO(title string, description string, siteURL string, path string) SEO {
+	baseURL := strings.TrimRight(siteURL, "/")
+	return SEO{
+		Title:        title,
+		Description:  description,
+		CanonicalURL: baseURL + path,
+		ImageURL:     baseURL + "/assets/images/og-hypermetrics.png",
+	}
+}
+
+func homeSEO(siteURL string) SEO {
+	meta := publicSEO(
+		"Real-time Hyperliquid market intelligence · Hypermetrics",
+		"Real-time Hyperliquid market intelligence for traders, bot builders, and product teams.",
+		siteURL,
+		"/",
+	)
+	baseURL := strings.TrimRight(siteURL, "/")
+	data, _ := json.Marshal(map[string]any{
+		"@context": "https://schema.org",
+		"@graph": []map[string]any{
+			{
+				"@type":        "WebSite",
+				"name":         "Hypermetrics",
+				"alternateName": "hypermetrics.xyz",
+				"url":          baseURL + "/",
+			},
+			{
+				"@type":       "Organization",
+				"name":        "Hypermetrics",
+				"url":         baseURL + "/",
+				"description": "Real-time Hyperliquid market intelligence for traders, bot builders, and product teams.",
+				"logo":        baseURL + "/assets/images/logo-512.png",
+				"email":       "hello@hypermetrics.xyz",
+			},
+		},
+	})
+	meta.StructuredData = string(data)
+	return meta
+}
+
+templ seoHead(meta SEO) {
+	<meta name="description" content={ meta.Description }/>
+	<title>{ meta.Title }</title>
+	<link rel="icon" type="image/svg+xml" href="/assets/images/favicon.svg"/>
+	<link rel="apple-touch-icon" sizes="180x180" href="/assets/images/apple-touch-icon.png"/>
+	if meta.NoIndex {
+		<meta name="robots" content="noindex, nofollow"/>
+	}
+	if meta.CanonicalURL != "" {
+		<link rel="canonical" href={ meta.CanonicalURL }/>
+		<meta property="og:type" content="website"/>
+		<meta property="og:site_name" content="Hypermetrics"/>
+		<meta property="og:title" content={ meta.Title }/>
+		<meta property="og:description" content={ meta.Description }/>
+		<meta property="og:url" content={ meta.CanonicalURL }/>
+		<meta property="og:image" content={ meta.ImageURL }/>
+		<meta property="og:image:width" content="1200"/>
+		<meta property="og:image:height" content="630"/>
+		<meta name="twitter:card" content="summary_large_image"/>
+		<meta name="twitter:title" content={ meta.Title }/>
+		<meta name="twitter:description" content={ meta.Description }/>
+		<meta name="twitter:image" content={ meta.ImageURL }/>
+	}
+	if meta.StructuredData != "" {
+		@templ.Raw(`<script type="application/ld+json">` + meta.StructuredData + `</script>`)
+	}
+}
+
+templ base(meta SEO, loggedIn bool) {
 	<!DOCTYPE html>
 	<html lang="en">
 		<head>
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1"/>
-			<meta name="description" content="Real-time Hyperliquid market intelligence for traders, bot builders, and product teams."/>
-			<title>{ title } · Hypermetrics</title>
+			@seoHead(meta)
 			<link rel="stylesheet" href="/assets/css/output.css"/>
 			<script src="/assets/js/theme.js"></script>
 		</head>

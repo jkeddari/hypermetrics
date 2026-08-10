@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"encoding/xml"
 	"errors"
 	"io"
 	"io/fs"
@@ -38,6 +39,8 @@ func SetupRoutes(webApp *app.WebApp) http.Handler {
 	mux.HandleFunc("GET /docs", s.docs)
 	mux.HandleFunc("GET /legal/privacy", s.privacy)
 	mux.HandleFunc("GET /legal/terms", s.terms)
+	mux.HandleFunc("GET /robots.txt", s.robots)
+	mux.HandleFunc("GET /sitemap.xml", s.sitemap)
 	mux.HandleFunc("GET /openapi.yaml", s.openAPISpec)
 	mux.HandleFunc("GET /auth", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/login", http.StatusPermanentRedirect)
@@ -61,16 +64,17 @@ func SetupRoutes(webApp *app.WebApp) http.Handler {
 	mux.HandleFunc("POST /app/billing/portal", s.requireAuth(s.createBillingPortal))
 	mux.HandleFunc("GET /{path...}", s.notFound)
 
-	return middleware.Chain(mux, securityHeaders(webApp.Cfg.APIBaseURL), middleware.RequestLogging)
+	return middleware.Chain(mux, securityHeaders(webApp.Cfg.APIBaseURL, webApp.Cfg.IsProduction()), middleware.RequestLogging)
 }
 
 func (s *server) home(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Cache-Control", "private, no-store")
 	user, err := s.app.AuthService.UserFromRequest(r)
 	if err != nil {
-		render(w, r, pages.Marketing(false, nil))
+		w.Header().Set("Cache-Control", "public, max-age=300")
+		render(w, r, pages.Marketing(s.siteURL(), false, nil))
 		return
 	}
+	w.Header().Set("Cache-Control", "private, no-store")
 	var subscription *model.Subscription
 	if s.app.BillingService != nil {
 		subscription, err = s.app.BillingService.GetSubscription(r.Context(), user.ID)
@@ -80,19 +84,54 @@ func (s *server) home(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	render(w, r, pages.Marketing(true, subscription))
+	render(w, r, pages.Marketing(s.siteURL(), true, subscription))
 }
 
 func (s *server) docs(w http.ResponseWriter, r *http.Request) {
-	render(w, r, pages.Docs())
+	render(w, r, pages.Docs(s.siteURL()))
 }
 
 func (s *server) privacy(w http.ResponseWriter, r *http.Request) {
-	render(w, r, pages.Privacy(s.loggedIn(r)))
+	render(w, r, pages.Privacy(s.siteURL(), s.loggedIn(r)))
 }
 
 func (s *server) terms(w http.ResponseWriter, r *http.Request) {
-	render(w, r, pages.Terms(s.loggedIn(r)))
+	render(w, r, pages.Terms(s.siteURL(), s.loggedIn(r)))
+}
+
+func (s *server) robots(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	if !s.app.Cfg.IsProduction() {
+		_, _ = io.WriteString(w, "User-agent: *\nDisallow: /\n")
+		return
+	}
+	_, _ = io.WriteString(w, "User-agent: *\nAllow: /\nDisallow: /app/\n\nSitemap: "+s.siteURL()+"/sitemap.xml\n")
+}
+
+type sitemapURL struct {
+	Location string `xml:"loc"`
+}
+
+type sitemapDocument struct {
+	XMLName xml.Name     `xml:"urlset"`
+	XMLNS   string       `xml:"xmlns,attr"`
+	URLs    []sitemapURL `xml:"url"`
+}
+
+func (s *server) sitemap(w http.ResponseWriter, _ *http.Request) {
+	baseURL := s.siteURL()
+	document := sitemapDocument{
+		XMLNS: "http://www.sitemaps.org/schemas/sitemap/0.9",
+		URLs: []sitemapURL{
+			{Location: baseURL + "/"},
+			{Location: baseURL + "/docs"},
+			{Location: baseURL + "/legal/privacy"},
+			{Location: baseURL + "/legal/terms"},
+		},
+	}
+	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
+	_, _ = io.WriteString(w, xml.Header)
+	_ = xml.NewEncoder(w).Encode(document)
 }
 
 func (s *server) openAPISpec(w http.ResponseWriter, _ *http.Request) {
@@ -102,9 +141,12 @@ func (s *server) openAPISpec(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 	baseURL := strings.TrimRight(s.app.Cfg.APIBaseURL, "/")
-	spec = []byte(strings.ReplaceAll(string(spec), "https://api.hypermetrics.dev", baseURL))
+	spec = []byte(strings.ReplaceAll(string(spec), "https://api.hypermetrics.xyz", baseURL))
 	w.Header().Set("Content-Type", "application/yaml; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache")
+	if w.Header().Get("X-Robots-Tag") == "" {
+		w.Header().Set("X-Robots-Tag", "noindex")
+	}
 	_, _ = w.Write(spec)
 }
 
@@ -490,6 +532,10 @@ func (s *server) loggedIn(r *http.Request) bool {
 	return err == nil
 }
 
+func (s *server) siteURL() string {
+	return strings.TrimRight(s.app.Cfg.AppURL, "/")
+}
+
 func currentUser(r *http.Request) *model.User {
 	return r.Context().Value(userContextKey{}).(*model.User)
 }
@@ -501,9 +547,12 @@ func render(w http.ResponseWriter, r *http.Request, component templ.Component) {
 	}
 }
 
-func securityHeaders(apiBaseURL string) func(http.Handler) http.Handler {
+func securityHeaders(apiBaseURL string, production bool) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if !production {
+				w.Header().Set("X-Robots-Tag", "noindex, nofollow")
+			}
 			policy := "default-src 'self'; style-src 'self'; img-src 'self' data:; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://checkout.stripe.com https://billing.stripe.com"
 			if r.URL.Path == "/docs" {
 				policy = "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' " + origin(apiBaseURL) + "; worker-src blob:; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"

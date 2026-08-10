@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Hypermetrics">
+  <rect width="512" height="512" rx="112" fill="#58b400"/>
+  <path fill="#ffffff" d="M132 112h72v108h104V112h72v288h-72V292H204v108h-72z"/>
+</svg>

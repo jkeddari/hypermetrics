@@ -1,14 +1,19 @@
 package pages
 
-templ Privacy(loggedIn bool) {
-	@base("Privacy Policy", loggedIn) {
+templ Privacy(siteURL string, loggedIn bool) {
+	@base(publicSEO(
+		"Privacy Policy · Hypermetrics",
+		"Learn how Hypermetrics collects, uses, protects, and retains account, billing, and API usage data.",
+		siteURL,
+		"/legal/privacy",
+	), loggedIn) {
 		<article class="container mx-auto max-w-4xl space-y-8 px-4 py-12 sm:py-16">
 			<header class="space-y-2">
 				<h1 class="text-3xl font-bold tracking-tight sm:text-4xl">Privacy Policy</h1>
 				<p class="text-sm text-muted-foreground">Last updated: August 6, 2026</p>
 			</header>
 			@legalSection("Who we are") {
-				<p>Hypermetrics provides real-time Hyperliquid market intelligence through a web application and API. For privacy questions or requests, contact <a class="underline underline-offset-4 hover:text-foreground" href="mailto:contact@hypermetrics.dev">contact@hypermetrics.dev</a>.</p>
+				<p>Hypermetrics provides real-time Hyperliquid market intelligence through a web application and API. For privacy questions or requests, contact <a class="underline underline-offset-4 hover:text-foreground" href="mailto:hello@hypermetrics.xyz">hello@hypermetrics.xyz</a>.</p>
 			}
 			@legalSection("Data we collect") {
 				<ul class="list-disc space-y-2 pl-5">

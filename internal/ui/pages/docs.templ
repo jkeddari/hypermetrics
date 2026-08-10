@@ -1,13 +1,17 @@
 package pages
 
-templ Docs() {
+templ Docs(siteURL string) {
 	<!DOCTYPE html>
 	<html lang="en">
 		<head>
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1"/>
-			<meta name="description" content="Interactive Hypermetrics API reference."/>
-			<title>API Reference · Hypermetrics</title>
+			@seoHead(publicSEO(
+				"Hypermetrics API Reference",
+				"Hypermetrics API documentation for Hyperliquid whale alerts, wallet positions, market structure, authentication, and rate limits.",
+				siteURL,
+				"/docs",
+			))
 			<script src="/assets/js/theme.js"></script>
 			<style>
 				.docs-controls {
@@ -37,7 +41,13 @@ templ Docs() {
 			<div class="docs-controls">
 				<a class="docs-control" href="/">← Accueil</a>
 			</div>
-			<div id="app"></div>
+			<div id="app">
+				<main style="max-width: 48rem; margin: 5rem auto; padding: 0 1.5rem; font-family: ui-sans-serif, system-ui, sans-serif;">
+					<h1>Hypermetrics API Reference</h1>
+					<p>Explore Hyperliquid whale alerts, wallet positions, market structure, authentication, and rate limits.</p>
+					<p><a href="/openapi.yaml">View the OpenAPI specification</a></p>
+				</main>
+			</div>
 			<script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.64.0"></script>
 			<script src="/assets/js/docs.js"></script>
 		</body>

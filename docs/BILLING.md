@@ -13,7 +13,7 @@ STRIPE_BUILDER_PRICE_ID=price_1U1UHA1uQmnGXz9tahh6px4X
 STRIPE_PRO_PRICE_ID=price_1U1UHJ1uQmnGXz9t5Bqs6JVL
 STRIPE_PORTAL_CONFIGURATION_ID=
 RESEND_API_KEY=re_...
-RESEND_FROM_EMAIL=Hypermetrics <billing@hypermetrics.dev>
+RESEND_FROM_EMAIL=Hypermetrics <hello@hypermetrics.xyz>
 ```
 
 Use sandbox keys and matching sandbox products/prices locally. Never combine a live secret key with test price IDs, or the reverse.

@@ -6,8 +6,11 @@ templ authBase(title string) {
 		<head>
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1"/>
-			<meta name="description" content="Secure access to your Hypermetrics account."/>
-			<title>{ title } · Hypermetrics</title>
+			@seoHead(SEO{
+				Title: title + " · Hypermetrics",
+				Description: "Secure access to your Hypermetrics account.",
+				NoIndex: true,
+			})
 			<link rel="stylesheet" href="/assets/css/output.css"/>
 			<script src="/assets/js/theme.js"></script>
 		</head>

@@ -7,8 +7,8 @@ import (
 	"github.com/jkeddari/hypermetrics/internal/model"
 )
 
-templ Marketing(loggedIn bool, subscription *model.Subscription) {
-	@base("Real-time Hyperliquid market intelligence", loggedIn) {
+templ Marketing(siteURL string, loggedIn bool, subscription *model.Subscription) {
+	@base(homeSEO(siteURL), loggedIn) {
 		<section class="relative overflow-hidden border-b py-20 sm:py-28 lg:py-32">
 			<div class="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,var(--color-primary),transparent_34%)] opacity-10"></div>
 			<div class="container mx-auto grid max-w-7xl items-center gap-14 px-4 lg:grid-cols-[1.08fr_0.92fr]">
