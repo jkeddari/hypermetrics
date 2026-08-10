@@ -39,7 +39,7 @@ templ Marketing(loggedIn bool, subscription *model.Subscription) {
 					if subscription.Entitled() {
 						<p class="mt-4 text-sm text-muted-foreground">Manage your API keys and subscription from your dashboard.</p>
 					} else {
-						<p class="mt-4 text-sm text-muted-foreground">Full API access for 7 days. Plans start at $20/month.</p>
+						<p class="mt-4 text-sm text-muted-foreground">Full API access for 7 days. Plans start at $19/month.</p>
 					}
 				</div>
 				<div class="relative mx-auto w-full max-w-xl">
@@ -108,8 +108,8 @@ templ Marketing(loggedIn bool, subscription *model.Subscription) {
 					<p class="mt-5 text-lg text-muted-foreground">Every plan includes the complete Hypermetrics API and a 7-day free trial. Choose the request capacity your product needs.</p>
 				</div>
 				<div class="mx-auto mt-14 grid max-w-7xl gap-6 md:grid-cols-2 lg:grid-cols-3">
-					@pricingCard("builder", "Builder", "For prototypes, dashboards, and focused trading tools.", "$20", "60", false, false, subscription)
-					@pricingCard("pro", "Pro", "For production bots and products with sustained traffic.", "$99", "600", true, false, subscription)
+					@pricingCard("builder", "Builder", "For prototypes, dashboards, and focused trading tools.", "$19", "60", false, false, subscription)
+					@pricingCard("pro", "Pro", "For production bots and products with sustained traffic.", "$49", "600", true, false, subscription)
 					@pricingCard("enterprise", "Enterprise", "For teams with custom throughput and support requirements.", "On request", "Custom", false, true, subscription)
 				</div>
 				<p class="mt-7 text-center text-sm text-muted-foreground">All prices are in USD and exclude tax. Applicable taxes are added at checkout. Billing starts after your 7-day trial.</p>

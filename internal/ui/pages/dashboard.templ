@@ -190,8 +190,8 @@ templ billingCard(subscription *model.Subscription, csrfToken string) {
 					<p class="mb-4 text-sm text-muted-foreground">Current status: <span class="font-medium text-foreground">{ subscription.Status }</span></p>
 				}
 				<div class="grid gap-3 sm:grid-cols-2">
-					@checkoutButton("builder", "Builder — $20/month", csrfToken, false)
-					@checkoutButton("pro", "Pro — $99/month", csrfToken, true)
+					@checkoutButton("builder", "Builder — $19/month", csrfToken, false)
+					@checkoutButton("pro", "Pro — $49/month", csrfToken, true)
 				</div>
 				if subscription.TrialEligible() {
 					<p class="mt-3 text-xs text-muted-foreground">Prices exclude tax. A payment method is collected now and charged after the 7-day trial unless you cancel.</p>
