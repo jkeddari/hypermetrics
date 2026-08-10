@@ -147,6 +147,7 @@ func (s *BillingService) CreateCheckout(ctx context.Context, user *model.User, p
 		SuccessURL:              stripe.String(s.checkoutSuccessURL()),
 		CancelURL:               stripe.String(s.appURL + "/app/dashboard?checkout=cancelled"),
 		PaymentMethodCollection: stripe.String("always"),
+		AllowPromotionCodes:     stripe.Bool(true),
 		AutomaticTax:            &stripe.CheckoutSessionCreateAutomaticTaxParams{Enabled: stripe.Bool(true)},
 		TaxIDCollection:         &stripe.CheckoutSessionCreateTaxIDCollectionParams{Enabled: stripe.Bool(true)},
 		CustomerUpdate:          &stripe.CheckoutSessionCreateCustomerUpdateParams{Address: stripe.String("auto"), Name: stripe.String("auto")},
