@@ -258,6 +258,8 @@ paths:
                 $ref: "#/components/schemas/DistributionResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
         "500":
           $ref: "#/components/responses/InternalError"
       x-codeSamples:
@@ -283,6 +285,8 @@ paths:
                 $ref: "#/components/schemas/DistributionResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
         "500":
           $ref: "#/components/responses/InternalError"
       x-codeSamples:
@@ -370,6 +374,16 @@ components:
           example:
             code: "1005"
             msg: upstream unavailable while refreshing wallet position
+            data: null
+    ServiceUnavailable:
+      description: The latest distribution snapshot is not available yet.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            code: "1006"
+            msg: wallet position distribution snapshot unavailable
             data: null
     InternalError:
       description: Hypermetrics could not complete the request.

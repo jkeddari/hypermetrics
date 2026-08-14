@@ -1,6 +1,7 @@
 package hypercore
 
 import (
+	"context"
 	"testing"
 	"time"
 )
@@ -129,6 +130,30 @@ func TestListWalletPnLDistribution(t *testing.T) {
 	gigaRekt := buckets[7]
 	if gigaRekt.GroupName != "giga_rekt" || gigaRekt.AllAddressCount != 1 || gigaRekt.LossAddressCount != 1 {
 		t.Fatalf("unexpected giga rekt bucket: %+v", gigaRekt)
+	}
+}
+
+func TestDistributionSnapshotRoundTrip(t *testing.T) {
+	now := time.Date(2026, 7, 30, 12, 0, 0, 0, time.UTC)
+	cfg := PriorityConfig{Now: func() time.Time { return now }}
+	store := openTestStore(t, cfg)
+
+	saveDistributionWallet(t, store, cfg, "0x0000000000000000000000000000000000000301", 500_000, []WalletPosition{
+		{Symbol: "BTC", PositionSize: 1, PositionValueUSD: 200_000, UnrealizedPnL: 150_000},
+	})
+
+	if err := store.RefreshDistributionSnapshot(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	position, pnl, computedAt, err := store.GetDistributionSnapshot(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if computedAt.IsZero() || len(position) != 8 || len(pnl) != 8 {
+		t.Fatalf("unexpected snapshot: computed_at=%v position=%d pnl=%d", computedAt, len(position), len(pnl))
+	}
+	if position[4].PositionUSD != 200_000 || pnl[0].LongPositionUSD != 200_000 {
+		t.Fatalf("unexpected snapshot values: position=%+v pnl=%+v", position[4], pnl[0])
 	}
 }
 

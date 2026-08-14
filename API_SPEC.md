@@ -391,7 +391,7 @@ Reference endpoint:
 https://open-api-v4.coinglass.com/api/hyperliquid/wallet/position-distribution
 ```
 
-This endpoint returns current wallet distribution grouped by position size tiers.
+This endpoint returns wallet distribution grouped by position size tiers. Core recomputes it every 15 minutes by default and the API serves the latest stored snapshot; before the first snapshot is ready, it returns `503`.
 
 ### Query Params
 
@@ -467,7 +467,7 @@ Reference endpoint:
 https://open-api-v4.coinglass.com/api/hyperliquid/wallet/pnl-distribution
 ```
 
-This endpoint returns current wallet distribution grouped by unrealized PnL tiers.
+This endpoint returns wallet distribution grouped by unrealized PnL tiers. Core recomputes it every 15 minutes by default and the API serves the latest stored snapshot; before the first snapshot is ready, it returns `503`.
 
 ### Query Params
 
@@ -603,7 +603,7 @@ Hypermetrics therefore needs a local data pipeline:
    - Powers `position`, `user-position`, and `whale-position`
 
 5. Snapshot aggregation
-   - Stores periodic `wallet_position_snapshots`
+   - Core periodically stores the latest `distribution_snapshots` aggregate
    - Powers `position-distribution`, `pnl-distribution`, and `global-long-short-account-ratio/history`
 
 6. Whale alert generation
@@ -651,8 +651,7 @@ Minimum tables:
 - `wallet_positions_current`
 - `wallet_position_snapshots`
 - `whale_alerts`
-- `position_distribution_snapshots`
-- `pnl_distribution_snapshots`
+- `distribution_snapshots`
 - `long_short_ratio_snapshots`
 - `ingestion_runs`
 

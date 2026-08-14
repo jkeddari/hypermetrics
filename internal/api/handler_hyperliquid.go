@@ -429,13 +429,9 @@ func (h *hyperliquidAPIHandler) wallets(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *hyperliquidAPIHandler) walletPositionDistribution(w http.ResponseWriter, r *http.Request) {
-	buckets, err := h.store.ListWalletPositionDistribution()
+	buckets, _, _, err := h.store.GetDistributionSnapshot(r.Context())
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, apimodel.ResponseEnvelope[any]{
-			Code: "1006",
-			Msg:  "failed to load wallet position distribution",
-			Data: nil,
-		})
+		writeDistributionSnapshotError(w, "wallet position", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, struct {
@@ -448,13 +444,9 @@ func (h *hyperliquidAPIHandler) walletPositionDistribution(w http.ResponseWriter
 }
 
 func (h *hyperliquidAPIHandler) walletPnLDistribution(w http.ResponseWriter, r *http.Request) {
-	buckets, err := h.store.ListWalletPnLDistribution()
+	_, buckets, _, err := h.store.GetDistributionSnapshot(r.Context())
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, apimodel.ResponseEnvelope[any]{
-			Code: "1006",
-			Msg:  "failed to load wallet pnl distribution",
-			Data: nil,
-		})
+		writeDistributionSnapshotError(w, "wallet pnl", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, struct {
@@ -463,6 +455,20 @@ func (h *hyperliquidAPIHandler) walletPnLDistribution(w http.ResponseWriter, r *
 	}{
 		Code: "0",
 		Data: mapPositionDistribution(buckets),
+	})
+}
+
+func writeDistributionSnapshotError(w http.ResponseWriter, name string, err error) {
+	status := http.StatusInternalServerError
+	message := "failed to load " + name + " distribution"
+	if errors.Is(err, hypercore.ErrDistributionSnapshotNotFound) {
+		status = http.StatusServiceUnavailable
+		message = name + " distribution snapshot unavailable"
+	}
+	writeJSON(w, status, apimodel.ResponseEnvelope[any]{
+		Code: "1006",
+		Msg:  message,
+		Data: nil,
 	})
 }
 

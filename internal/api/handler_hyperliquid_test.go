@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"net/http"
@@ -65,6 +66,9 @@ func TestHyperliquidCurrentEndpoints(t *testing.T) {
 
 	wallet := walletFromTestState(state)
 	if err := store.SaveWalletState(wallet, state); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.RefreshDistributionSnapshot(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -340,6 +344,23 @@ func TestWriteRefreshErrorUsesServiceStatuses(t *testing.T) {
 	for _, test := range tests {
 		recorder := httptest.NewRecorder()
 		writeRefreshError(recorder, test.err)
+		if recorder.Code != test.want {
+			t.Fatalf("expected %d, got %d", test.want, recorder.Code)
+		}
+	}
+}
+
+func TestWriteDistributionSnapshotErrorUsesServiceStatuses(t *testing.T) {
+	tests := []struct {
+		err  error
+		want int
+	}{
+		{hypercore.ErrDistributionSnapshotNotFound, http.StatusServiceUnavailable},
+		{errors.New("database unavailable"), http.StatusInternalServerError},
+	}
+	for _, test := range tests {
+		recorder := httptest.NewRecorder()
+		writeDistributionSnapshotError(recorder, "wallet position", test.err)
 		if recorder.Code != test.want {
 			t.Fatalf("expected %d, got %d", test.want, recorder.Code)
 		}

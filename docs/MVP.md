@@ -163,7 +163,7 @@ The MVP can support the public API surface in stages.
 
 - `GET /api/hyperliquid/wallet/position-distribution`
 - `GET /api/hyperliquid/wallet/pnl-distribution`
-- position distribution is aggregated from current indexed wallets
+- distributions are recomputed by Core every 15 minutes and served from the latest snapshot
 - historical/PnL distributions can add periodic aggregate snapshots when required
 
 ### Stage 6
@@ -190,8 +190,7 @@ Minimum tables for the MVP:
 Optional but useful:
 
 - `wallet_leaderboard_snapshots`
-- `position_distribution_snapshots`
-- `pnl_distribution_snapshots`
+- `distribution_snapshots`
 - `long_short_ratio_snapshots`
 
 ## Current Position Tables

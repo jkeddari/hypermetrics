@@ -3,6 +3,7 @@ package hypercore
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -10,8 +11,9 @@ import (
 )
 
 var (
-	ErrWalletNotFound   = errors.New("wallet not found")
-	ErrStoreUnavailable = errors.New("postgres store unavailable")
+	ErrWalletNotFound               = errors.New("wallet not found")
+	ErrStoreUnavailable             = errors.New("postgres store unavailable")
+	ErrDistributionSnapshotNotFound = errors.New("distribution snapshot not found")
 )
 
 const (
@@ -25,6 +27,10 @@ const (
 type Store struct {
 	db  *sql.DB
 	cfg PriorityConfig
+}
+
+type sqlQueryer interface {
+	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
 }
 
 type RefreshJob struct {
@@ -761,10 +767,14 @@ func (s *Store) ListWhalePositions(thresholdUSD float64) ([]WalletPosition, erro
 }
 
 func (s *Store) ListWalletPositionDistribution() ([]PositionDistributionBucket, error) {
+	return s.listWalletPositionDistribution(context.Background(), s.db)
+}
+
+func (s *Store) listWalletPositionDistribution(ctx context.Context, queryer sqlQueryer) ([]PositionDistributionBucket, error) {
 	if s == nil || s.db == nil {
 		return nil, ErrStoreUnavailable
 	}
-	rows, err := s.db.Query(`
+	rows, err := queryer.QueryContext(ctx, `
 		WITH tiers (ordinal, group_name, minimum_amount, maximum_amount) AS (
 			VALUES
 				(1, 'shrimp',          0::float8,       250::float8),
@@ -841,10 +851,14 @@ func (s *Store) ListWalletPositionDistribution() ([]PositionDistributionBucket, 
 }
 
 func (s *Store) ListWalletPnLDistribution() ([]PositionDistributionBucket, error) {
+	return s.listWalletPnLDistribution(context.Background(), s.db)
+}
+
+func (s *Store) listWalletPnLDistribution(ctx context.Context, queryer sqlQueryer) ([]PositionDistributionBucket, error) {
 	if s == nil || s.db == nil {
 		return nil, ErrStoreUnavailable
 	}
-	rows, err := s.db.Query(`
+	rows, err := queryer.QueryContext(ctx, `
 		WITH tiers (ordinal, group_name, minimum_amount, maximum_amount) AS (
 			VALUES
 				(1, 'money_printer',   100000::float8,  1000000::float8),
@@ -914,6 +928,80 @@ func (s *Store) ListWalletPnLDistribution() ([]PositionDistributionBucket, error
 		buckets = append(buckets, finalizePositionDistribution(bucket, longWallets, shortWallets))
 	}
 	return buckets, rows.Err()
+}
+
+func (s *Store) RefreshDistributionSnapshot(ctx context.Context) error {
+	if s == nil || s.db == nil {
+		return ErrStoreUnavailable
+	}
+
+	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead})
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	position, err := s.listWalletPositionDistribution(ctx, tx)
+	if err != nil {
+		return err
+	}
+	pnl, err := s.listWalletPnLDistribution(ctx, tx)
+	if err != nil {
+		return err
+	}
+	positionJSON, err := json.Marshal(position)
+	if err != nil {
+		return err
+	}
+	pnlJSON, err := json.Marshal(pnl)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO distribution_snapshots (id, computed_at, position_distribution, pnl_distribution)
+		VALUES (1, $1, $2::jsonb, $3::jsonb)
+		ON CONFLICT (id) DO UPDATE SET
+			computed_at = EXCLUDED.computed_at,
+			position_distribution = EXCLUDED.position_distribution,
+			pnl_distribution = EXCLUDED.pnl_distribution`,
+		time.Now().UTC(), string(positionJSON), string(pnlJSON),
+	)
+	if err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func (s *Store) GetDistributionSnapshot(ctx context.Context) (
+	position []PositionDistributionBucket,
+	pnl []PositionDistributionBucket,
+	computedAt time.Time,
+	err error,
+) {
+	if s == nil || s.db == nil {
+		return nil, nil, time.Time{}, ErrStoreUnavailable
+	}
+
+	var positionJSON, pnlJSON string
+	err = s.db.QueryRowContext(ctx, `
+		SELECT computed_at, position_distribution, pnl_distribution
+		FROM distribution_snapshots
+		WHERE id = 1`,
+	).Scan(&computedAt, &positionJSON, &pnlJSON)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil, time.Time{}, ErrDistributionSnapshotNotFound
+	}
+	if err != nil {
+		return nil, nil, time.Time{}, err
+	}
+	if err := json.Unmarshal([]byte(positionJSON), &position); err != nil {
+		return nil, nil, time.Time{}, err
+	}
+	if err := json.Unmarshal([]byte(pnlJSON), &pnl); err != nil {
+		return nil, nil, time.Time{}, err
+	}
+	return position, pnl, computedAt, nil
 }
 
 func (s *Store) ListWhaleAlerts(limit int) ([]WhaleAlert, error) {

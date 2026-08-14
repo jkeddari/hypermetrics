@@ -1,12 +1,16 @@
 package config
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func TestLoadUsesDatabaseURLWithoutEnvironmentMode(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://localhost/hypermetrics")
 	t.Setenv("NATS_URL", "nats://nats:4222")
 	t.Setenv("PORT", "9876")
 	t.Setenv("STRIPE_BUILDER_PRICE_ID", "price_builder")
+	t.Setenv("HYPERCORE_DISTRIBUTION_INTERVAL", "11m")
 
 	cfg := Load(".env.test")
 	if cfg.DatabaseURL != "postgres://localhost/hypermetrics" {
@@ -20,5 +24,8 @@ func TestLoadUsesDatabaseURLWithoutEnvironmentMode(t *testing.T) {
 	}
 	if cfg.StripeBuilderPriceID != "price_builder" {
 		t.Fatalf("unexpected Stripe builder price: %q", cfg.StripeBuilderPriceID)
+	}
+	if cfg.HypercoreDistributionInterval != 11*time.Minute {
+		t.Fatalf("unexpected distribution interval: %v", cfg.HypercoreDistributionInterval)
 	}
 }

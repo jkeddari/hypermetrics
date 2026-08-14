@@ -35,6 +35,7 @@ func main() {
 		LeaderboardURL:       cfg.HypercoreLeaderboardURL,
 		RefreshRatePerSecond: cfg.HypercoreRefreshRate,
 		StatsLogInterval:     cfg.HypercoreStatsLogInterval,
+		DistributionInterval: cfg.HypercoreDistributionInterval,
 		WhaleThresholdUSD:    cfg.HypercoreWhaleThresholdUSD,
 		RejectedCandidateTTL: cfg.HypercoreRejectedCandidateTTL,
 	})

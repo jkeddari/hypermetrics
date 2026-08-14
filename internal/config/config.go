@@ -37,6 +37,7 @@ type Config struct {
 	HypercoreLeaderboardURL       string
 	HypercoreRefreshRate          float64
 	HypercoreStatsLogInterval     time.Duration
+	HypercoreDistributionInterval time.Duration
 	HypercoreWhaleThresholdUSD    float64
 	HypercoreRejectedCandidateTTL time.Duration
 
@@ -75,6 +76,7 @@ func Load(envFile string) *Config {
 		HypercoreLeaderboardURL:       envString("HYPERCORE_LEADERBOARD_URL", ""),
 		HypercoreRefreshRate:          envFloat("HYPERCORE_REFRESH_RATE", 7),
 		HypercoreStatsLogInterval:     envDuration("HYPERCORE_STATS_LOG_INTERVAL", time.Minute),
+		HypercoreDistributionInterval: envDuration("HYPERCORE_DISTRIBUTION_INTERVAL", 15*time.Minute),
 		HypercoreWhaleThresholdUSD:    envFloat("HYPERCORE_WHALE_THRESHOLD_USD", 1_000_000),
 		HypercoreRejectedCandidateTTL: envDuration("HYPERCORE_REJECTED_CANDIDATE_TTL", 12*time.Hour),
 
