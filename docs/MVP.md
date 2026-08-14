@@ -137,8 +137,9 @@ The MVP can support the public API surface in stages.
 ### Stage 1
 
 - `GET /api/hyperliquid/user-position`
+- `GET /api/hyperliquid/wallet/overview`
 - served from PostgreSQL; cache misses request a synchronous Core refresh through NATS
-- cached into current tables
+- cached into current Perpetuals, Spot balances, and open-order tables
 
 ### Stage 2
 

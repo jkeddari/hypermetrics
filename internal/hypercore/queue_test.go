@@ -763,6 +763,20 @@ func TestRefreshQueueSharesRateLimitAcrossRequests(t *testing.T) {
 	}
 }
 
+func TestRefreshQueueAppliesWeightedUpstreamRateLimit(t *testing.T) {
+	queue := &RefreshQueue{cfg: QueueConfig{RefreshRatePerSecond: 20, UpstreamRequestWeight: 24}}
+	if err := queue.waitForRequestSlot(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	started := time.Now()
+	if err := queue.waitForRequestSlot(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if elapsed := time.Since(started); elapsed < time.Second {
+		t.Fatalf("expected weighted rate limit delay, got %s", elapsed)
+	}
+}
+
 type fakeWalletStateClient struct {
 	state WalletState
 	err   error

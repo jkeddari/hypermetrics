@@ -72,6 +72,65 @@ type UserPositionData struct {
 	AssetPosition []AssetPosition `json:"asset_positions"`
 }
 
+type SpotBalanceItem struct {
+	Coin          string  `json:"coin"`
+	Token         int     `json:"token"`
+	Hold          float64 `json:"hold"`
+	Total         float64 `json:"total"`
+	EntryNtl      float64 `json:"entry_ntl"`
+	MarkPrice     float64 `json:"mark_price"`
+	ValueUSD      float64 `json:"value_usd"`
+	UnrealizedPnL float64 `json:"unrealized_pnl"`
+}
+
+type OpenOrderItem struct {
+	OID              int64   `json:"oid"`
+	ClientOID        string  `json:"client_oid,omitempty"`
+	Coin             string  `json:"coin"`
+	Symbol           string  `json:"symbol,omitempty"`
+	MarketType       string  `json:"market_type"`
+	Side             string  `json:"side"`
+	OrderType        string  `json:"order_type"`
+	LimitPrice       float64 `json:"limit_price"`
+	Size             float64 `json:"size"`
+	OriginalSize     float64 `json:"original_size"`
+	ReduceOnly       bool    `json:"reduce_only"`
+	IsTrigger        bool    `json:"is_trigger"`
+	IsPositionTPSL   bool    `json:"is_position_tpsl"`
+	TriggerCondition string  `json:"trigger_condition,omitempty"`
+	TriggerPrice     float64 `json:"trigger_price"`
+	Timestamp        int64   `json:"timestamp"`
+}
+
+type PerpetualOverview struct {
+	MarginSummary MarginSummary   `json:"margin_summary"`
+	Positions     []AssetPosition `json:"positions"`
+	OpenOrders    []OpenOrderItem `json:"open_orders"`
+	UnrealizedPnL float64         `json:"unrealized_pnl"`
+}
+
+type SpotOverview struct {
+	Balances      []SpotBalanceItem `json:"balances"`
+	OpenOrders    []OpenOrderItem   `json:"open_orders"`
+	ValueUSD      float64           `json:"value_usd"`
+	UnrealizedPnL float64           `json:"unrealized_pnl"`
+}
+
+type WalletOverviewTotals struct {
+	PerpetualAccountValue float64 `json:"perpetual_account_value"`
+	SpotValueUSD          float64 `json:"spot_value_usd"`
+	TotalValueUSD         float64 `json:"total_value_usd"`
+	UnrealizedPnL         float64 `json:"unrealized_pnl"`
+}
+
+type WalletOverviewData struct {
+	User        string               `json:"user"`
+	RefreshedAt int64                `json:"refreshed_at"`
+	Totals      WalletOverviewTotals `json:"totals"`
+	Perpetuals  PerpetualOverview    `json:"perpetuals"`
+	Spot        SpotOverview         `json:"spot"`
+}
+
 type WalletItem struct {
 	Address               string   `json:"address"`
 	Sources               []string `json:"sources"`

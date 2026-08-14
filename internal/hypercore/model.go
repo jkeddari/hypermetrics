@@ -125,9 +125,72 @@ type WalletPosition struct {
 	RefreshedAt      time.Time `json:"refreshed_at"`
 }
 
+type SpotToken struct {
+	Index       int       `json:"index"`
+	Name        string    `json:"name"`
+	SzDecimals  int       `json:"sz_decimals"`
+	WeiDecimals int       `json:"wei_decimals"`
+	TokenID     string    `json:"token_id"`
+	IsCanonical bool      `json:"is_canonical"`
+	EVMContract string    `json:"evm_contract,omitempty"`
+	FullName    string    `json:"full_name,omitempty"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+type SpotMarket struct {
+	Index             int       `json:"index"`
+	Name              string    `json:"name"`
+	BaseTokenIndex    int       `json:"base_token_index"`
+	QuoteTokenIndex   int       `json:"quote_token_index"`
+	IsCanonical       bool      `json:"is_canonical"`
+	MarkPrice         float64   `json:"mark_price"`
+	MidPrice          float64   `json:"mid_price"`
+	PreviousDayPrice  float64   `json:"previous_day_price"`
+	DayNotionalVolume float64   `json:"day_notional_volume"`
+	UpdatedAt         time.Time `json:"updated_at"`
+}
+
+type SpotBalance struct {
+	Address       string    `json:"address"`
+	Token         int       `json:"token"`
+	Coin          string    `json:"coin"`
+	Hold          float64   `json:"hold"`
+	Total         float64   `json:"total"`
+	EntryNtl      float64   `json:"entry_ntl"`
+	MarkPrice     float64   `json:"mark_price"`
+	ValueUSD      float64   `json:"value_usd"`
+	UnrealizedPnL float64   `json:"unrealized_pnl"`
+	RefreshedAt   time.Time `json:"refreshed_at"`
+}
+
+type WalletOpenOrder struct {
+	Address          string    `json:"address"`
+	OID              int64     `json:"oid"`
+	ClientOID        string    `json:"client_oid,omitempty"`
+	DEX              string    `json:"dex,omitempty"`
+	Coin             string    `json:"coin"`
+	MarketType       string    `json:"market_type"`
+	Side             string    `json:"side"`
+	OrderType        string    `json:"order_type"`
+	LimitPrice       float64   `json:"limit_price"`
+	Size             float64   `json:"size"`
+	OriginalSize     float64   `json:"original_size"`
+	ReduceOnly       bool      `json:"reduce_only"`
+	IsTrigger        bool      `json:"is_trigger"`
+	IsPositionTPSL   bool      `json:"is_position_tpsl"`
+	TriggerCondition string    `json:"trigger_condition,omitempty"`
+	TriggerPrice     float64   `json:"trigger_price"`
+	OrderTimestamp   int64     `json:"order_timestamp"`
+	RefreshedAt      time.Time `json:"refreshed_at"`
+}
+
 type WalletState struct {
-	Account   WalletAccount    `json:"account"`
-	Positions []WalletPosition `json:"positions"`
+	Account      WalletAccount     `json:"account"`
+	Positions    []WalletPosition  `json:"positions"`
+	SpotTokens   []SpotToken       `json:"spot_tokens,omitempty"`
+	SpotMarkets  []SpotMarket      `json:"spot_markets,omitempty"`
+	SpotBalances []SpotBalance     `json:"spot_balances,omitempty"`
+	OpenOrders   []WalletOpenOrder `json:"open_orders,omitempty"`
 }
 
 const (

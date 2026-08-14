@@ -51,9 +51,10 @@ func Open(cfg Config) (*Service, error) {
 	client := NewHyperliquidClient("", nil)
 	collector := NewCollector(store, &http.Client{Timeout: 20 * time.Second})
 	queue := NewRefreshQueue(store, client, QueueConfig{
-		RefreshRatePerSecond: cfg.RefreshRatePerSecond,
-		StatsLogInterval:     cfg.StatsLogInterval,
-		Priority:             priorityCfg,
+		RefreshRatePerSecond:  cfg.RefreshRatePerSecond,
+		UpstreamRequestWeight: 24,
+		StatsLogInterval:      cfg.StatsLogInterval,
+		Priority:              priorityCfg,
 	})
 
 	return &Service{

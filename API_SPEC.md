@@ -323,7 +323,59 @@ This endpoint is served from PostgreSQL. On a cache miss or stale row, the API a
 
 ---
 
-## 5. Hyperliquid Wallet Position Distribution
+## 5. Hyperliquid Wallet Overview
+
+### Endpoint
+
+```http
+GET /api/hyperliquid/wallet/overview
+```
+
+Returns the complete current wallet snapshot: Perpetuals margin and open positions, Spot balances, open orders, market values, and unrealized P&L. Missing or stale data is refreshed by Core before the response.
+
+### Query Params
+
+- `user_address` required
+- `user` is accepted as a compatibility alias
+
+### Response
+
+```json
+{
+  "code": "0",
+  "msg": "success",
+  "data": {
+    "user": "0x20c2d95a3dfdca9e9ad12794d5fa6fad99da44f5",
+    "refreshed_at": 1785960000000,
+    "totals": {
+      "perpetual_account_value": 123456.78,
+      "spot_value_usd": 2500.12,
+      "total_value_usd": 125956.90,
+      "unrealized_pnl": 3825.40
+    },
+    "perpetuals": {
+      "margin_summary": { "account_value": 123456.78, "margin_used": 45678.12, "withdrawable": 77778.66 },
+      "positions": [],
+      "open_orders": [],
+      "unrealized_pnl": 3750
+    },
+    "spot": {
+      "balances": [],
+      "open_orders": [],
+      "value_usd": 2500.12,
+      "unrealized_pnl": 75.40
+    }
+  }
+}
+```
+
+`/user-position` remains the Perpetuals-only CoinGlass-compatible endpoint. Spot balances represent holdings and holds; Spot does not expose Perpetual-style open positions.
+
+For Spot open orders, `coin` keeps Hyperliquid's raw identifier such as `@107`, while `symbol` contains the readable market resolved from Spot metadata, for example `APE/USDC`.
+
+---
+
+## 6. Hyperliquid Wallet Position Distribution
 
 ### Endpoint
 
@@ -399,7 +451,7 @@ All percentage fields are rounded to two decimals and return `0` for an empty de
 
 ---
 
-## 6. Hyperliquid Wallet PnL Distribution
+## 7. Hyperliquid Wallet PnL Distribution
 
 ### Endpoint
 
@@ -458,7 +510,7 @@ For each wallet, bucket by total unrealized PnL:
 
 ---
 
-## 7. Hyperliquid Global Long Short Account Ratio History
+## 8. Hyperliquid Global Long Short Account Ratio History
 
 ### Endpoint
 

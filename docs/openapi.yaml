@@ -167,6 +167,44 @@ paths:
               --url 'https://api.hypermetrics.xyz/api/hyperliquid/user-position?user_address=0x1234567890abcdef1234567890abcdef12345678' \
               --header 'HM-API-KEY: hm_live_your_key'
 
+  /api/hyperliquid/wallet/overview:
+    get:
+      operationId: getWalletOverview
+      tags: [Positions]
+      summary: Get a complete wallet overview
+      description: Returns Perpetuals positions and margin, Spot balances, open orders, values, and unrealized P&L. Missing or stale data is refreshed from Hyperliquid before responding.
+      parameters:
+        - name: user_address
+          in: query
+          required: true
+          description: EVM wallet address. The legacy `user` parameter is also accepted as an alias.
+          schema:
+            type: string
+            pattern: "^0x[a-fA-F0-9]{40}$"
+          example: "0x1234567890abcdef1234567890abcdef12345678"
+      responses:
+        "200":
+          description: Wallet overview loaded successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WalletOverviewResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "502":
+          $ref: "#/components/responses/UpstreamUnavailable"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      x-codeSamples:
+        - lang: Shell
+          label: cURL
+          source: |
+            curl --request GET \
+              --url 'https://api.hypermetrics.xyz/api/hyperliquid/wallet/overview?user_address=0x1234567890abcdef1234567890abcdef12345678' \
+              --header 'HM-API-KEY: hm_live_your_key'
+
   /api/hyperliquid/wallets:
     get:
       operationId: listWallets
@@ -411,6 +449,17 @@ components:
           const: success
         data:
           $ref: "#/components/schemas/UserPosition"
+    WalletOverviewResponse:
+      type: object
+      required: [code, msg, data]
+      properties:
+        code:
+          $ref: "#/components/schemas/SuccessCode"
+        msg:
+          type: string
+          const: success
+        data:
+          $ref: "#/components/schemas/WalletOverview"
     WalletsResponse:
       type: object
       required: [code, msg, data]
@@ -554,6 +603,137 @@ components:
           type: number
           format: double
           example: -812.25
+
+    WalletOverview:
+      type: object
+      required: [user, refreshed_at, totals, perpetuals, spot]
+      properties:
+        user:
+          $ref: "#/components/schemas/Address"
+        refreshed_at:
+          $ref: "#/components/schemas/UnixTimestampMilliseconds"
+        totals:
+          $ref: "#/components/schemas/WalletOverviewTotals"
+        perpetuals:
+          $ref: "#/components/schemas/PerpetualOverview"
+        spot:
+          $ref: "#/components/schemas/SpotOverview"
+    WalletOverviewTotals:
+      type: object
+      required: [perpetual_account_value, spot_value_usd, total_value_usd, unrealized_pnl]
+      properties:
+        perpetual_account_value:
+          $ref: "#/components/schemas/UsdAmount"
+        spot_value_usd:
+          $ref: "#/components/schemas/UsdAmount"
+        total_value_usd:
+          $ref: "#/components/schemas/UsdAmount"
+        unrealized_pnl:
+          type: number
+          format: double
+    PerpetualOverview:
+      type: object
+      required: [margin_summary, positions, open_orders, unrealized_pnl]
+      properties:
+        margin_summary:
+          $ref: "#/components/schemas/MarginSummary"
+        positions:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssetPosition"
+        open_orders:
+          type: array
+          items:
+            $ref: "#/components/schemas/OpenOrder"
+        unrealized_pnl:
+          type: number
+          format: double
+    SpotOverview:
+      type: object
+      required: [balances, open_orders, value_usd, unrealized_pnl]
+      properties:
+        balances:
+          type: array
+          items:
+            $ref: "#/components/schemas/SpotBalance"
+        open_orders:
+          type: array
+          items:
+            $ref: "#/components/schemas/OpenOrder"
+        value_usd:
+          $ref: "#/components/schemas/UsdAmount"
+        unrealized_pnl:
+          type: number
+          format: double
+    SpotBalance:
+      type: object
+      required: [coin, token, hold, total, entry_ntl, mark_price, value_usd, unrealized_pnl]
+      properties:
+        coin:
+          type: string
+        token:
+          type: integer
+        hold:
+          type: number
+          format: double
+        total:
+          type: number
+          format: double
+        entry_ntl:
+          type: number
+          format: double
+        mark_price:
+          type: number
+          format: double
+        value_usd:
+          $ref: "#/components/schemas/UsdAmount"
+        unrealized_pnl:
+          type: number
+          format: double
+    OpenOrder:
+      type: object
+      required: [oid, coin, market_type, side, order_type, limit_price, size, original_size, reduce_only, is_trigger, is_position_tpsl, trigger_price, timestamp]
+      properties:
+        oid:
+          type: integer
+          format: int64
+        client_oid:
+          type: string
+        coin:
+          type: string
+        symbol:
+          type: string
+          description: Human-readable Spot market symbol resolved from spot metadata. The raw Hyperliquid identifier remains in `coin`.
+        market_type:
+          type: string
+          enum: [spot, perpetual]
+        side:
+          type: string
+        order_type:
+          type: string
+        limit_price:
+          type: number
+          format: double
+        size:
+          type: number
+          format: double
+        original_size:
+          type: number
+          format: double
+        reduce_only:
+          type: boolean
+        is_trigger:
+          type: boolean
+        is_position_tpsl:
+          type: boolean
+        trigger_condition:
+          type: string
+        trigger_price:
+          type: number
+          format: double
+        timestamp:
+          type: integer
+          format: int64
 
     Wallet:
       type: object

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The refresh queue decides which wallets should be refreshed through Hyperliquid `clearinghouseState`.
+The refresh queue decides which wallets should be refreshed through Hyperliquid account, Spot and order REST checks.
 
 This is the central backend component for the product. Hypermetrics cannot refresh every wallet uniformly at high frequency, so the queue must prioritize wallets that are most likely to matter.
 
@@ -14,23 +14,25 @@ Hyperliquid public REST limit:
 1200 weight / minute / IP
 ```
 
-`clearinghouseState` weight:
+Per wallet refresh, Hypermetrics checks `clearinghouseState`, `spotClearinghouseState` and `frontendOpenOrders`.
+
+The weighted request budget is therefore:
 
 ```txt
-2
+24 weight per wallet refresh (2 + 2 + 20)
 ```
 
-Maximum theoretical throughput:
+Maximum theoretical throughput for the full wallet snapshot:
 
 ```txt
-600 wallets / minute / IP
-10 wallets / second / IP
+50 wallets / minute / IP
+0.83 wallets / second / IP
 ```
 
 Recommended operational throughput:
 
 ```txt
-6-8 wallets / second / IP
+0.7-0.8 wallets / second / IP
 ```
 
 The queue should be built around the safe rate, not the theoretical maximum.
@@ -317,7 +319,7 @@ The coverage deadline cannot be pushed forward by a leaderboard re-poll. Initial
 The Core process applies one shared limiter to scheduled and on-demand calls. The default is:
 
 ```txt
-rate: 7 clearinghouseState calls / second / Core process
+rate: 7 refreshes / second is the configured ceiling; the weighted limiter caps full snapshots at about 0.83 wallet / second / Core process.
 ```
 
 PostgreSQL leases make multiple Core instances safe for deduplication, but the rate limit is process-local. Deploy one Core instance while it shares an egress IP; multiple API replicas are safe because they do not call Hyperliquid. Before scaling Core horizontally, move the limiter to shared state or divide the global budget between instances.

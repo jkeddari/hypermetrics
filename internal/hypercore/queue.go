@@ -11,11 +11,12 @@ import (
 )
 
 type QueueConfig struct {
-	RefreshRatePerSecond float64
-	IdleSleep            time.Duration
-	RequestTimeout       time.Duration
-	StatsLogInterval     time.Duration
-	Priority             PriorityConfig
+	RefreshRatePerSecond  float64
+	UpstreamRequestWeight float64
+	IdleSleep             time.Duration
+	RequestTimeout        time.Duration
+	StatsLogInterval      time.Duration
+	Priority              PriorityConfig
 }
 
 type RefreshQueue struct {
@@ -47,6 +48,9 @@ func NewRefreshQueue(store *Store, client WalletStateClient, cfg QueueConfig) *R
 	}
 	if cfg.RequestTimeout <= 0 {
 		cfg.RequestTimeout = 15 * time.Second
+	}
+	if cfg.UpstreamRequestWeight <= 0 {
+		cfg.UpstreamRequestWeight = 2
 	}
 	if cfg.StatsLogInterval <= 0 {
 		cfg.StatsLogInterval = time.Minute
@@ -278,6 +282,10 @@ func (q *RefreshQueue) waitForRequestSlot(ctx context.Context) error {
 		return err
 	}
 	interval := time.Duration(float64(time.Second) / q.cfg.RefreshRatePerSecond)
+	weightedInterval := time.Duration(float64(time.Second) * q.cfg.UpstreamRequestWeight / 20)
+	if weightedInterval > interval {
+		interval = weightedInterval
+	}
 	q.rateMu.Lock()
 	readyAt := q.nextRequest
 	now := time.Now()

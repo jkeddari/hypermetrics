@@ -344,6 +344,15 @@ func (s *Store) SaveWalletState(wallet Wallet, state WalletState) error {
 			return err
 		}
 	}
+	if err := saveSpotMetadata(ctx, tx, state.SpotTokens, state.SpotMarkets); err != nil {
+		return err
+	}
+	if err := saveSpotBalances(ctx, tx, wallet.Address, state.SpotBalances, refreshedAt); err != nil {
+		return err
+	}
+	if err := saveOpenOrders(ctx, tx, wallet.Address, state.OpenOrders, refreshedAt); err != nil {
+		return err
+	}
 	if !previousRefreshedAt.IsZero() && refreshedAt.After(previousRefreshedAt) {
 		for _, alert := range detectWhaleAlerts(previousPositions, state.Positions, s.cfg.whaleThreshold(), refreshedAt) {
 			if _, err := tx.ExecContext(ctx, `
@@ -366,6 +375,148 @@ func (s *Store) SaveWalletState(wallet Wallet, state WalletState) error {
 		return err
 	}
 	return tx.Commit()
+}
+
+func saveSpotMetadata(ctx context.Context, tx *sql.Tx, tokens []SpotToken, markets []SpotMarket) error {
+	for _, token := range tokens {
+		updatedAt := token.UpdatedAt
+		if updatedAt.IsZero() {
+			updatedAt = time.Now().UTC()
+		}
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO spot_tokens (
+				token_index, name, sz_decimals, wei_decimals, token_id, is_canonical,
+				evm_contract, full_name, updated_at
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+			ON CONFLICT (token_index) DO UPDATE SET
+				name = EXCLUDED.name,
+				sz_decimals = EXCLUDED.sz_decimals,
+				wei_decimals = EXCLUDED.wei_decimals,
+				token_id = EXCLUDED.token_id,
+				is_canonical = EXCLUDED.is_canonical,
+				evm_contract = EXCLUDED.evm_contract,
+				full_name = EXCLUDED.full_name,
+				updated_at = EXCLUDED.updated_at`,
+			token.Index, token.Name, token.SzDecimals, token.WeiDecimals, token.TokenID,
+			token.IsCanonical, token.EVMContract, token.FullName, updatedAt,
+		); err != nil {
+			return err
+		}
+	}
+
+	for _, market := range markets {
+		updatedAt := market.UpdatedAt
+		if updatedAt.IsZero() {
+			updatedAt = time.Now().UTC()
+		}
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO spot_markets (
+				market_index, name, base_token_index, quote_token_index, is_canonical,
+				mark_price, mid_price, previous_day_price, day_notional_volume, updated_at
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+			ON CONFLICT (market_index) DO UPDATE SET
+				name = EXCLUDED.name,
+				base_token_index = EXCLUDED.base_token_index,
+				quote_token_index = EXCLUDED.quote_token_index,
+				is_canonical = EXCLUDED.is_canonical,
+				mark_price = EXCLUDED.mark_price,
+				mid_price = EXCLUDED.mid_price,
+				previous_day_price = EXCLUDED.previous_day_price,
+				day_notional_volume = EXCLUDED.day_notional_volume,
+				updated_at = EXCLUDED.updated_at`,
+			market.Index, market.Name, market.BaseTokenIndex, market.QuoteTokenIndex,
+			market.IsCanonical, market.MarkPrice, market.MidPrice, market.PreviousDayPrice,
+			market.DayNotionalVolume, updatedAt,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func saveSpotBalances(ctx context.Context, tx *sql.Tx, address string, balances []SpotBalance, refreshedAt time.Time) error {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM wallet_spot_balances_current WHERE wallet_address = $1`, address); err != nil {
+		return err
+	}
+	for _, balance := range balances {
+		balanceRefreshedAt := balance.RefreshedAt
+		if balanceRefreshedAt.IsZero() {
+			balanceRefreshedAt = refreshedAt
+		}
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO wallet_spot_balances_current (
+				wallet_address, token_index, coin, hold, total, entry_ntl, mark_price,
+				value_usd, unrealized_pnl, refreshed_at
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+			ON CONFLICT (wallet_address, token_index) DO UPDATE SET
+				coin = EXCLUDED.coin,
+				hold = EXCLUDED.hold,
+				total = EXCLUDED.total,
+				entry_ntl = EXCLUDED.entry_ntl,
+				mark_price = EXCLUDED.mark_price,
+				value_usd = EXCLUDED.value_usd,
+				unrealized_pnl = EXCLUDED.unrealized_pnl,
+				refreshed_at = EXCLUDED.refreshed_at`,
+			address, balance.Token, balance.Coin, balance.Hold, balance.Total, balance.EntryNtl,
+			balance.MarkPrice, balance.ValueUSD, balance.UnrealizedPnL, balanceRefreshedAt,
+		); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO wallet_spot_balance_history (
+				wallet_address, token_index, coin, hold, total, entry_ntl, mark_price,
+				value_usd, unrealized_pnl, refreshed_at
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+			ON CONFLICT DO NOTHING`,
+			address, balance.Token, balance.Coin, balance.Hold, balance.Total, balance.EntryNtl,
+			balance.MarkPrice, balance.ValueUSD, balance.UnrealizedPnL, balanceRefreshedAt,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func saveOpenOrders(ctx context.Context, tx *sql.Tx, address string, orders []WalletOpenOrder, refreshedAt time.Time) error {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM wallet_open_orders_current WHERE wallet_address = $1`, address); err != nil {
+		return err
+	}
+	for _, order := range orders {
+		orderRefreshedAt := order.RefreshedAt
+		if orderRefreshedAt.IsZero() {
+			orderRefreshedAt = refreshedAt
+		}
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO wallet_open_orders_current (
+				wallet_address, oid, client_oid, dex, coin, market_type, side, order_type,
+				limit_price, size, original_size, reduce_only, is_trigger, is_position_tpsl,
+				trigger_condition, trigger_price, order_timestamp, refreshed_at
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+			ON CONFLICT (wallet_address, dex, oid) DO UPDATE SET
+				client_oid = EXCLUDED.client_oid,
+				coin = EXCLUDED.coin,
+				market_type = EXCLUDED.market_type,
+				side = EXCLUDED.side,
+				order_type = EXCLUDED.order_type,
+				limit_price = EXCLUDED.limit_price,
+				size = EXCLUDED.size,
+				original_size = EXCLUDED.original_size,
+				reduce_only = EXCLUDED.reduce_only,
+				is_trigger = EXCLUDED.is_trigger,
+				is_position_tpsl = EXCLUDED.is_position_tpsl,
+				trigger_condition = EXCLUDED.trigger_condition,
+				trigger_price = EXCLUDED.trigger_price,
+				order_timestamp = EXCLUDED.order_timestamp,
+				refreshed_at = EXCLUDED.refreshed_at`,
+			address, order.OID, order.ClientOID, order.DEX, order.Coin, order.MarketType,
+			order.Side, order.OrderType, order.LimitPrice, order.Size, order.OriginalSize,
+			order.ReduceOnly, order.IsTrigger, order.IsPositionTPSL, order.TriggerCondition,
+			order.TriggerPrice, order.OrderTimestamp, orderRefreshedAt,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *Store) RejectCandidate(candidate WalletCandidate, realAccountValue float64, reason string) error {
@@ -460,7 +611,128 @@ func (s *Store) GetWalletState(address string) (WalletState, error) {
 		return WalletState{}, err
 	}
 	state.Positions = positions
+	state.SpotTokens, err = s.listSpotTokens(ctx)
+	if err != nil {
+		return WalletState{}, err
+	}
+	state.SpotMarkets, err = s.listSpotMarkets(ctx)
+	if err != nil {
+		return WalletState{}, err
+	}
+	state.SpotBalances, err = s.listSpotBalances(ctx, address)
+	if err != nil {
+		return WalletState{}, err
+	}
+	state.OpenOrders, err = s.listOpenOrders(ctx, address)
+	if err != nil {
+		return WalletState{}, err
+	}
 	return state, nil
+}
+
+func (s *Store) listSpotTokens(ctx context.Context) ([]SpotToken, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT token_index, name, sz_decimals, wei_decimals, token_id, is_canonical,
+			evm_contract, full_name, updated_at
+		FROM spot_tokens ORDER BY token_index`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	tokens := make([]SpotToken, 0)
+	for rows.Next() {
+		var token SpotToken
+		if err := rows.Scan(
+			&token.Index, &token.Name, &token.SzDecimals, &token.WeiDecimals,
+			&token.TokenID, &token.IsCanonical, &token.EVMContract, &token.FullName,
+			&token.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		tokens = append(tokens, token)
+	}
+	return tokens, rows.Err()
+}
+
+func (s *Store) listSpotMarkets(ctx context.Context) ([]SpotMarket, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT market_index, name, base_token_index, quote_token_index, is_canonical,
+			mark_price, mid_price, previous_day_price, day_notional_volume, updated_at
+		FROM spot_markets ORDER BY market_index`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	markets := make([]SpotMarket, 0)
+	for rows.Next() {
+		var market SpotMarket
+		if err := rows.Scan(
+			&market.Index, &market.Name, &market.BaseTokenIndex, &market.QuoteTokenIndex,
+			&market.IsCanonical, &market.MarkPrice, &market.MidPrice, &market.PreviousDayPrice,
+			&market.DayNotionalVolume, &market.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		markets = append(markets, market)
+	}
+	return markets, rows.Err()
+}
+
+func (s *Store) listSpotBalances(ctx context.Context, address string) ([]SpotBalance, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT wallet_address, token_index, coin, hold, total, entry_ntl, mark_price,
+			value_usd, unrealized_pnl, refreshed_at
+		FROM wallet_spot_balances_current
+		WHERE wallet_address = $1 ORDER BY token_index`, address)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	balances := make([]SpotBalance, 0)
+	for rows.Next() {
+		var balance SpotBalance
+		if err := rows.Scan(
+			&balance.Address, &balance.Token, &balance.Coin, &balance.Hold, &balance.Total,
+			&balance.EntryNtl, &balance.MarkPrice, &balance.ValueUSD, &balance.UnrealizedPnL,
+			&balance.RefreshedAt,
+		); err != nil {
+			return nil, err
+		}
+		balances = append(balances, balance)
+	}
+	return balances, rows.Err()
+}
+
+func (s *Store) listOpenOrders(ctx context.Context, address string) ([]WalletOpenOrder, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT wallet_address, oid, client_oid, dex, coin, market_type, side, order_type,
+			limit_price, size, original_size, reduce_only, is_trigger, is_position_tpsl,
+			trigger_condition, trigger_price, order_timestamp, refreshed_at
+		FROM wallet_open_orders_current
+		WHERE wallet_address = $1 ORDER BY order_timestamp DESC, oid`, address)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	orders := make([]WalletOpenOrder, 0)
+	for rows.Next() {
+		var order WalletOpenOrder
+		if err := rows.Scan(
+			&order.Address, &order.OID, &order.ClientOID, &order.DEX, &order.Coin,
+			&order.MarketType, &order.Side, &order.OrderType, &order.LimitPrice,
+			&order.Size, &order.OriginalSize, &order.ReduceOnly, &order.IsTrigger,
+			&order.IsPositionTPSL, &order.TriggerCondition, &order.TriggerPrice,
+			&order.OrderTimestamp, &order.RefreshedAt,
+		); err != nil {
+			return nil, err
+		}
+		orders = append(orders, order)
+	}
+	return orders, rows.Err()
 }
 
 func (s *Store) ListPositionsBySymbol(symbol string, currentPage, pageSize int) ([]WalletPosition, error) {

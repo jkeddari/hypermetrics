@@ -50,6 +50,16 @@ func TestHyperliquidCurrentEndpoints(t *testing.T) {
 				RefreshedAt:      now,
 			},
 		},
+		SpotBalances: []hypercore.SpotBalance{
+			{
+				Address: user, Token: 0, Coin: "USDC", Total: 2500,
+				MarkPrice: 1, ValueUSD: 2500, RefreshedAt: now,
+			},
+		},
+		OpenOrders: []hypercore.WalletOpenOrder{
+			{Address: user, OID: 1, Coin: "BTC", MarketType: "perpetual", Side: "B", OrderType: "Limit", Size: 1, OriginalSize: 1},
+			{Address: user, OID: 2, Coin: "PURR/USDC", MarketType: "spot", Side: "A", OrderType: "Limit", Size: 5, OriginalSize: 5},
+		},
 	}
 
 	wallet := hypercore.ApplyRefreshSuccess(hypercore.Wallet{Address: user}, state, hypercore.PriorityConfig{
@@ -77,6 +87,27 @@ func TestHyperliquidCurrentEndpoints(t *testing.T) {
 		}
 		if envelope.Code != "0" || envelope.Data.User != user || len(envelope.Data.AssetPosition) != 1 {
 			t.Fatalf("unexpected envelope: %+v", envelope)
+		}
+	})
+
+	t.Run("wallet overview", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/api/hyperliquid/wallet/overview?user_address="+user, nil)
+		rec := httptest.NewRecorder()
+
+		handler.WalletOverview(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
+		}
+		var envelope apimodel.ResponseEnvelope[apimodel.WalletOverviewData]
+		if err := json.NewDecoder(rec.Body).Decode(&envelope); err != nil {
+			t.Fatal(err)
+		}
+		if envelope.Code != "0" || envelope.Data.Totals.TotalValueUSD != 502500 {
+			t.Fatalf("unexpected overview totals: %+v", envelope.Data.Totals)
+		}
+		if len(envelope.Data.Spot.Balances) != 1 || len(envelope.Data.Spot.OpenOrders) != 1 || len(envelope.Data.Perpetuals.OpenOrders) != 1 {
+			t.Fatalf("unexpected overview details: %+v", envelope.Data)
 		}
 	})
 
@@ -283,6 +314,17 @@ func TestWalletStateFreshForFiveMinutes(t *testing.T) {
 	state.Account.RefreshedAt = now.Add(-5 * time.Minute)
 	if walletStateFresh(state, now) {
 		t.Fatal("expected state five minutes old to be stale")
+	}
+}
+
+func TestSpotOrderSymbolResolvesAtCoin(t *testing.T) {
+	_, spotOrders := mapOpenOrders(
+		[]hypercore.WalletOpenOrder{{Coin: "@107", MarketType: "spot"}},
+		[]hypercore.SpotMarket{{Index: 107, Name: "@107", BaseTokenIndex: 1, QuoteTokenIndex: 0}},
+		[]hypercore.SpotToken{{Index: 0, Name: "USDC"}, {Index: 1, Name: "APE"}},
+	)
+	if len(spotOrders) != 1 || spotOrders[0].Symbol != "APE/USDC" {
+		t.Fatalf("unexpected spot order symbol: %+v", spotOrders)
 	}
 }
 

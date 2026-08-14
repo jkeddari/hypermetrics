@@ -167,19 +167,10 @@ func (h *HyperliquidAPIHandler) UserPosition(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	state, err := h.store.GetWalletState(user)
-	if errors.Is(err, hypercore.ErrWalletNotFound) || err == nil && !walletStateFresh(state, time.Now().UTC()) {
-		refreshErr := h.refreshUserPosition(r.Context(), user)
-		refreshedState, refreshedErr := h.store.GetWalletState(user)
-		if refreshedErr == nil && walletStateFresh(refreshedState, time.Now().UTC()) {
-			state, err = refreshedState, nil
-		} else if refreshErr != nil {
-			writeRefreshError(w, refreshErr)
-			return
-		} else {
-			writeRefreshError(w, corebus.ErrRefreshFailed)
-			return
-		}
+	state, refreshErr, err := h.loadWalletState(r.Context(), user)
+	if refreshErr != nil {
+		writeRefreshError(w, refreshErr)
+		return
 	}
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, apimodel.ResponseEnvelope[any]{
@@ -197,6 +188,76 @@ func (h *HyperliquidAPIHandler) UserPosition(w http.ResponseWriter, r *http.Requ
 	})
 }
 
+func (h *HyperliquidAPIHandler) WalletOverview(w http.ResponseWriter, r *http.Request) {
+	if h.store == nil {
+		writeJSON(w, http.StatusInternalServerError, apimodel.ResponseEnvelope[any]{
+			Code: "1006",
+			Msg:  "hypercore store unavailable",
+			Data: nil,
+		})
+		return
+	}
+
+	query := r.URL.Query()
+	user := hypercore.NormalizeAddress(query.Get("user_address"))
+	if user == "" {
+		user = hypercore.NormalizeAddress(query.Get("user"))
+	}
+	if user == "" {
+		writeJSON(w, http.StatusBadRequest, apimodel.ResponseEnvelope[any]{
+			Code: "1001",
+			Msg:  "missing required parameter: user_address",
+			Data: nil,
+		})
+		return
+	}
+	if !hypercore.IsAddress(user) {
+		writeJSON(w, http.StatusBadRequest, apimodel.ResponseEnvelope[any]{
+			Code: "1002",
+			Msg:  "invalid parameter: user_address",
+			Data: nil,
+		})
+		return
+	}
+
+	state, refreshErr, err := h.loadWalletState(r.Context(), user)
+	if refreshErr != nil {
+		writeRefreshError(w, refreshErr)
+		return
+	}
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, apimodel.ResponseEnvelope[any]{
+			Code: "1006",
+			Msg:  "failed to load wallet overview",
+			Data: nil,
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, apimodel.ResponseEnvelope[apimodel.WalletOverviewData]{
+		Code: "0",
+		Msg:  "success",
+		Data: mapWalletOverview(state),
+	})
+}
+
+func (h *HyperliquidAPIHandler) loadWalletState(ctx context.Context, user string) (hypercore.WalletState, error, error) {
+	state, err := h.store.GetWalletState(user)
+	if !errors.Is(err, hypercore.ErrWalletNotFound) && (err != nil || walletStateFresh(state, time.Now().UTC())) {
+		return state, nil, err
+	}
+
+	refreshErr := h.refreshUserPosition(ctx, user)
+	refreshedState, refreshedErr := h.store.GetWalletState(user)
+	if refreshedErr == nil && walletStateFresh(refreshedState, time.Now().UTC()) {
+		return refreshedState, nil, nil
+	}
+	if refreshErr != nil {
+		return state, refreshErr, nil
+	}
+	return state, corebus.ErrRefreshFailed, nil
+}
+
 func walletStateFresh(state hypercore.WalletState, now time.Time) bool {
 	refreshedAt := state.Account.RefreshedAt
 	return !refreshedAt.IsZero() && now.Sub(refreshedAt) < hypercore.OnDemandFreshness
@@ -207,6 +268,114 @@ func (h *HyperliquidAPIHandler) refreshUserPosition(ctx context.Context, user st
 		return corebus.ErrCoreUnavailable
 	}
 	return h.refreshRequester.RequestWalletRefresh(ctx, user)
+}
+
+func mapWalletOverview(state hypercore.WalletState) apimodel.WalletOverviewData {
+	perpetualPositions := make([]apimodel.AssetPosition, 0, len(state.Positions))
+	perpetualPnL := 0.0
+	for _, position := range state.Positions {
+		perpetualPnL += position.UnrealizedPnL
+		perpetualPositions = append(perpetualPositions, apimodel.AssetPosition{
+			Symbol:           position.Symbol,
+			PositionSize:     position.PositionSize,
+			EntryPrice:       position.EntryPrice,
+			MarkPrice:        position.MarkPrice,
+			LiqPrice:         position.LiqPrice,
+			Leverage:         position.Leverage,
+			PositionValueUSD: position.PositionValueUSD,
+			UnrealizedPnL:    position.UnrealizedPnL,
+		})
+	}
+
+	spotBalances := make([]apimodel.SpotBalanceItem, 0, len(state.SpotBalances))
+	spotValueUSD := 0.0
+	spotPnL := 0.0
+	for _, balance := range state.SpotBalances {
+		spotValueUSD += balance.ValueUSD
+		spotPnL += balance.UnrealizedPnL
+		spotBalances = append(spotBalances, apimodel.SpotBalanceItem{
+			Coin: balance.Coin, Token: balance.Token, Hold: balance.Hold, Total: balance.Total,
+			EntryNtl: balance.EntryNtl, MarkPrice: balance.MarkPrice, ValueUSD: balance.ValueUSD,
+			UnrealizedPnL: balance.UnrealizedPnL,
+		})
+	}
+
+	perpetualOrders, spotOrders := mapOpenOrders(state.OpenOrders, state.SpotMarkets, state.SpotTokens)
+	totalPnL := perpetualPnL + spotPnL
+	return apimodel.WalletOverviewData{
+		User:        state.Account.Address,
+		RefreshedAt: state.Account.RefreshedAt.UnixMilli(),
+		Totals: apimodel.WalletOverviewTotals{
+			PerpetualAccountValue: state.Account.AccountValue,
+			SpotValueUSD:          spotValueUSD,
+			TotalValueUSD:         state.Account.AccountValue + spotValueUSD,
+			UnrealizedPnL:         totalPnL,
+		},
+		Perpetuals: apimodel.PerpetualOverview{
+			MarginSummary: apimodel.MarginSummary{
+				AccountValue: state.Account.AccountValue,
+				MarginUsed:   state.Account.MarginUsed,
+				Withdrawable: state.Account.Withdrawable,
+			},
+			Positions: perpetualPositions, OpenOrders: perpetualOrders, UnrealizedPnL: perpetualPnL,
+		},
+		Spot: apimodel.SpotOverview{
+			Balances: spotBalances, OpenOrders: spotOrders, ValueUSD: spotValueUSD, UnrealizedPnL: spotPnL,
+		},
+	}
+}
+
+func mapOpenOrders(orders []hypercore.WalletOpenOrder, markets []hypercore.SpotMarket, tokens []hypercore.SpotToken) ([]apimodel.OpenOrderItem, []apimodel.OpenOrderItem) {
+	perpetuals := make([]apimodel.OpenOrderItem, 0)
+	spot := make([]apimodel.OpenOrderItem, 0)
+	for _, order := range orders {
+		item := apimodel.OpenOrderItem{
+			OID: order.OID, ClientOID: order.ClientOID, Coin: order.Coin, MarketType: order.MarketType,
+			Side: order.Side, OrderType: order.OrderType, LimitPrice: order.LimitPrice, Size: order.Size,
+			OriginalSize: order.OriginalSize, ReduceOnly: order.ReduceOnly, IsTrigger: order.IsTrigger,
+			IsPositionTPSL: order.IsPositionTPSL, TriggerCondition: order.TriggerCondition,
+			TriggerPrice: order.TriggerPrice, Timestamp: order.OrderTimestamp,
+		}
+		if order.MarketType == "spot" {
+			item.Symbol = spotOrderSymbol(order.Coin, markets, tokens)
+			spot = append(spot, item)
+		} else {
+			perpetuals = append(perpetuals, item)
+		}
+	}
+	return perpetuals, spot
+}
+
+func spotOrderSymbol(coin string, markets []hypercore.SpotMarket, tokens []hypercore.SpotToken) string {
+	if !strings.HasPrefix(coin, "@") {
+		return coin
+	}
+	marketIndex, err := strconv.Atoi(strings.TrimPrefix(coin, "@"))
+	if err != nil {
+		return coin
+	}
+	tokenNames := make(map[int]string, len(tokens))
+	for _, token := range tokens {
+		tokenNames[token.Index] = token.Name
+	}
+	for _, market := range markets {
+		if market.Index != marketIndex {
+			continue
+		}
+		if market.Name != "" && !strings.HasPrefix(market.Name, "@") {
+			return market.Name
+		}
+		base := tokenNames[market.BaseTokenIndex]
+		quote := tokenNames[market.QuoteTokenIndex]
+		if base != "" && quote != "" {
+			return base + "/" + quote
+		}
+		if base != "" {
+			return base
+		}
+		return coin
+	}
+	return coin
 }
 
 func writeRefreshError(w http.ResponseWriter, err error) {
