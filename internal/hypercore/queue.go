@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -25,6 +26,8 @@ type RefreshQueue struct {
 	workerID    string
 	claimNumber uint64
 	leaseNumber uint64
+	rateMu      sync.Mutex
+	nextRequest time.Time
 }
 
 type RefreshQueueStats struct {
@@ -133,7 +136,7 @@ func (q *RefreshQueue) RefreshOne(ctx context.Context) (bool, error) {
 	if err != nil {
 		return true, err
 	}
-	state, err := q.client.GetClearinghouseState(requestCtx, wallet.Address)
+	state, err := q.getClearinghouseState(requestCtx, wallet.Address)
 	if err != nil {
 		wallet = ApplyRefreshFailure(wallet, err, q.cfg.Priority)
 		if saveErr := q.store.SaveWallet(wallet); saveErr != nil {
@@ -155,7 +158,7 @@ func (q *RefreshQueue) refreshCandidate(ctx context.Context, candidate WalletCan
 	requestCtx, cancel := context.WithTimeout(ctx, q.cfg.RequestTimeout)
 	defer cancel()
 
-	state, err := q.client.GetClearinghouseState(requestCtx, candidate.Address)
+	state, err := q.getClearinghouseState(requestCtx, candidate.Address)
 	if err != nil {
 		candidate.ScanAttempts++
 		candidate.ConsecutiveFailure++
@@ -246,7 +249,7 @@ func (q *RefreshQueue) RefreshWallet(ctx context.Context, address string) (Walle
 	requestCtx, cancel := context.WithTimeout(ctx, q.cfg.RequestTimeout)
 	defer cancel()
 
-	state, err := q.client.GetClearinghouseState(requestCtx, address)
+	state, err := q.getClearinghouseState(requestCtx, address)
 	if err != nil {
 		wallet = ApplyRefreshFailure(wallet, err, q.cfg.Priority)
 		if saveErr := q.store.SaveWallet(wallet); saveErr != nil {
@@ -261,6 +264,41 @@ func (q *RefreshQueue) RefreshWallet(ctx context.Context, address string) (Walle
 	}
 
 	return state, nil
+}
+
+func (q *RefreshQueue) getClearinghouseState(ctx context.Context, address string) (WalletState, error) {
+	if err := q.waitForRequestSlot(ctx); err != nil {
+		return WalletState{}, err
+	}
+	return q.client.GetClearinghouseState(ctx, address)
+}
+
+func (q *RefreshQueue) waitForRequestSlot(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	interval := time.Duration(float64(time.Second) / q.cfg.RefreshRatePerSecond)
+	q.rateMu.Lock()
+	readyAt := q.nextRequest
+	now := time.Now()
+	if readyAt.Before(now) {
+		readyAt = now
+	}
+	q.nextRequest = readyAt.Add(interval)
+	q.rateMu.Unlock()
+
+	delay := time.Until(readyAt)
+	if delay <= 0 {
+		return nil
+	}
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }
 
 func (q *RefreshQueue) nextLeaseID() string {

@@ -1,23 +1,24 @@
 package app
 
 import (
-	"context"
 	"database/sql"
 	"fmt"
-	"log/slog"
 
 	"github.com/jkeddari/hypermetrics/internal/config"
+	"github.com/jkeddari/hypermetrics/internal/corebus"
 	"github.com/jkeddari/hypermetrics/internal/db"
 	"github.com/jkeddari/hypermetrics/internal/hypercore"
 	"github.com/jkeddari/hypermetrics/internal/service"
+	"github.com/nats-io/nats.go"
 )
 
 type APIApp struct {
-	Cfg              *config.Config
-	DB               *sql.DB
-	APIKeyService    *service.APIKeyService
-	HypercoreService *hypercore.Service
-	HypercoreStore   *hypercore.Store
+	Cfg            *config.Config
+	DB             *sql.DB
+	APIKeyService  *service.APIKeyService
+	HypercoreStore *hypercore.Store
+	CoreClient     *corebus.Client
+	NATS           *nats.Conn
 }
 
 type WebApp struct {
@@ -39,25 +40,23 @@ func NewAPI(cfg *config.Config) (*APIApp, error) {
 		return nil, fmt.Errorf("failed to run migrations: %w", err)
 	}
 
-	hypercoreService, err := hypercore.Open(hypercore.Config{
-		DB:                   database,
-		LeaderboardURL:       cfg.HypercoreLeaderboardURL,
-		RefreshRatePerSecond: cfg.HypercoreRefreshRate,
-		StatsLogInterval:     cfg.HypercoreStatsLogInterval,
+	store := hypercore.OpenStore(database, hypercore.PriorityConfig{
 		WhaleThresholdUSD:    cfg.HypercoreWhaleThresholdUSD,
 		RejectedCandidateTTL: cfg.HypercoreRejectedCandidateTTL,
 	})
+	natsConn, err := corebus.Connect(cfg.NATSURL, "hypermetrics-api")
 	if err != nil {
 		_ = database.Close()
-		return nil, fmt.Errorf("failed to initialize hypercore store: %w", err)
+		return nil, fmt.Errorf("failed to connect to NATS: %w", err)
 	}
 
 	return &APIApp{
-		Cfg:              cfg,
-		DB:               database,
-		APIKeyService:    service.NewAPIKeyService(database, cfg.APIKeys...),
-		HypercoreService: hypercoreService,
-		HypercoreStore:   hypercoreService.Store(),
+		Cfg:            cfg,
+		DB:             database,
+		APIKeyService:  service.NewAPIKeyService(database, cfg.APIKeys...),
+		HypercoreStore: store,
+		CoreClient:     corebus.NewClient(natsConn),
+		NATS:           natsConn,
 	}, nil
 }
 
@@ -106,24 +105,9 @@ func (a *WebApp) Close() error {
 	return nil
 }
 
-func (a *APIApp) RunHypercoreCollectors(ctx context.Context) {
-	if a == nil || a.HypercoreService == nil || !a.Cfg.HypercoreRunCollectors {
-		return
-	}
-
-	go func() {
-		slog.Info("hypercore collectors starting inside api process")
-		if err := a.HypercoreService.RunCollectors(ctx); err != nil && ctx.Err() == nil {
-			slog.Error("hypercore collectors stopped", "error", err)
-		}
-	}()
-}
-
 func (a *APIApp) Close() error {
-	if a.HypercoreService != nil {
-		if err := a.HypercoreService.Close(); err != nil {
-			return err
-		}
+	if a.NATS != nil {
+		a.NATS.Close()
 	}
 	if a.DB != nil {
 		return a.DB.Close()

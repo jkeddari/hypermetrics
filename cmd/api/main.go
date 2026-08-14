@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"log/slog"
 	"net/http"
 	"time"
@@ -28,8 +27,6 @@ func main() {
 			slog.Error("failed to close api app", "error", closeErr)
 		}
 	}()
-
-	app.RunHypercoreCollectors(context.Background())
 
 	handler := api.SetupRoutes(app)
 	slog.Info("api server starting", "port", cfg.Port, "url", "http://localhost:"+cfg.Port)

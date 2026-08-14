@@ -749,6 +749,20 @@ func TestConcurrentOnDemandRefreshCallsUpstreamOnce(t *testing.T) {
 	}
 }
 
+func TestRefreshQueueSharesRateLimitAcrossRequests(t *testing.T) {
+	queue := &RefreshQueue{cfg: QueueConfig{RefreshRatePerSecond: 20}}
+	if err := queue.waitForRequestSlot(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	started := time.Now()
+	if err := queue.waitForRequestSlot(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if elapsed := time.Since(started); elapsed < 40*time.Millisecond {
+		t.Fatalf("expected shared rate limit delay, got %s", elapsed)
+	}
+}
+
 type fakeWalletStateClient struct {
 	state WalletState
 	err   error

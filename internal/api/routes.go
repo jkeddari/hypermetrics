@@ -9,7 +9,7 @@ import (
 
 func SetupRoutes(app *app.APIApp) http.Handler {
 	requireAPIKey := middleware.RequireAPIKey(app.APIKeyService)
-	hyperliquidAPI := NewHyperliquidAPIHandler(app.HypercoreStore, app.HypercoreService, app.Cfg.HypercoreWhaleThresholdUSD)
+	hyperliquidAPI := NewHyperliquidAPIHandler(app.HypercoreStore, app.CoreClient, app.Cfg.HypercoreWhaleThresholdUSD)
 
 	mux := http.NewServeMux()
 

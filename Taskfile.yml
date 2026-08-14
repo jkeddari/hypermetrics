@@ -2,9 +2,9 @@ version: "3"
 
 tasks:
   db:up:
-    desc: Start local PostgreSQL
+    desc: Start local PostgreSQL and NATS
     cmds:
-      - docker compose up -d --wait postgres
+      - docker compose up -d --wait postgres nats
 
   db:down:
     desc: Stop local PostgreSQL
@@ -16,6 +16,12 @@ tasks:
     deps: [db:up]
     cmds:
       - go run ./cmd/api/main.go
+
+  dev:core:
+    desc: Start the Core service
+    deps: [db:up]
+    cmds:
+      - go run ./cmd/core/main.go
 
   generate:
     desc: Generate server-rendered Templ components

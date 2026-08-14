@@ -137,7 +137,7 @@ The MVP can support the public API surface in stages.
 ### Stage 1
 
 - `GET /api/hyperliquid/user-position`
-- served directly from `clearinghouseState` on cache miss
+- served from PostgreSQL; cache misses request a synchronous Core refresh through NATS
 - cached into current tables
 
 ### Stage 2

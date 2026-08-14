@@ -4,7 +4,7 @@ import "testing"
 
 func TestLoadUsesDatabaseURLWithoutEnvironmentMode(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://localhost/hypermetrics")
-	t.Setenv("HYPERCORE_RUN_COLLECTORS", "")
+	t.Setenv("NATS_URL", "nats://nats:4222")
 	t.Setenv("PORT", "9876")
 	t.Setenv("STRIPE_BUILDER_PRICE_ID", "price_builder")
 
@@ -12,8 +12,8 @@ func TestLoadUsesDatabaseURLWithoutEnvironmentMode(t *testing.T) {
 	if cfg.DatabaseURL != "postgres://localhost/hypermetrics" {
 		t.Fatalf("unexpected database URL: %q", cfg.DatabaseURL)
 	}
-	if !cfg.HypercoreRunCollectors {
-		t.Fatal("expected collectors to run by default")
+	if cfg.NATSURL != "nats://nats:4222" {
+		t.Fatalf("unexpected NATS URL: %q", cfg.NATSURL)
 	}
 	if cfg.Port != "9876" {
 		t.Fatalf("unexpected port: %q", cfg.Port)

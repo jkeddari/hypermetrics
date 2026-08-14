@@ -1,4 +1,9 @@
 services:
+  nats:
+    image: nats:2-alpine
+    ports:
+      - "4222:4222"
+
   postgres:
     image: postgres:18-alpine
     environment:
@@ -22,13 +27,31 @@ services:
     environment:
       PORT: 8080
       DATABASE_URL: postgres://hypermetrics:hypermetrics@postgres:5432/hypermetrics?sslmode=disable
+      NATS_URL: ${NATS_URL:-nats://nats:4222}
       HM_API_KEYS: ${HM_API_KEYS:-}
-      HYPERCORE_RUN_COLLECTORS: ${HYPERCORE_RUN_COLLECTORS:-true}
     ports:
       - "8080:8080"
     depends_on:
       postgres:
         condition: service_healthy
+      nats:
+        condition: service_started
+
+  core:
+    build:
+      context: .
+      dockerfile: Dockerfile.core
+    environment:
+      DATABASE_URL: postgres://hypermetrics:hypermetrics@postgres:5432/hypermetrics?sslmode=disable
+      NATS_URL: ${NATS_URL:-nats://nats:4222}
+      HYPERCORE_LEADERBOARD_URL: ${HYPERCORE_LEADERBOARD_URL:-}
+      HYPERCORE_REFRESH_RATE: ${HYPERCORE_REFRESH_RATE:-7}
+      HYPERCORE_WHALE_THRESHOLD_USD: ${HYPERCORE_WHALE_THRESHOLD_USD:-1000000}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_started
 
   web:
     build:

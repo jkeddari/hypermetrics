@@ -18,6 +18,7 @@ type Config struct {
 	Port       string
 
 	DatabaseURL string
+	NATSURL     string
 
 	SentryDSN string
 
@@ -34,7 +35,6 @@ type Config struct {
 	ResendAPIKey                string
 	ResendFromEmail             string
 
-	HypercoreRunCollectors        bool
 	HypercoreLeaderboardURL       string
 	HypercoreRefreshRate          float64
 	HypercoreStatsLogInterval     time.Duration
@@ -59,6 +59,7 @@ func Load(envFile string) *Config {
 		APIBaseURL:  envString("API_BASE_URL", "http://localhost:8080"),
 		Port:        envString("PORT", "8080"),
 		DatabaseURL: envString("DATABASE_URL", ""),
+		NATSURL:     envString("NATS_URL", "nats://localhost:4222"),
 		SentryDSN:   envString("SENTRY_DSN", ""),
 		APIKeys:     apiKeys,
 
@@ -73,7 +74,6 @@ func Load(envFile string) *Config {
 		ResendAPIKey:                envString("RESEND_API_KEY", ""),
 		ResendFromEmail:             envString("RESEND_FROM_EMAIL", ""),
 
-		HypercoreRunCollectors:        envBool("HYPERCORE_RUN_COLLECTORS", true),
 		HypercoreLeaderboardURL:       envString("HYPERCORE_LEADERBOARD_URL", ""),
 		HypercoreRefreshRate:          envFloat("HYPERCORE_REFRESH_RATE", 7),
 		HypercoreStatsLogInterval:     envDuration("HYPERCORE_STATS_LOG_INTERVAL", time.Minute),

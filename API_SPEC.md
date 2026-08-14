@@ -319,7 +319,7 @@ GET /api/hyperliquid/user-position?user_address=0x20c2d95a3dfdca9e9ad12794d5fa6f
 
 ### Hyperliquid Source
 
-This endpoint can be served directly from Hyperliquid `clearinghouseState` for cache misses or from local snapshots for low latency.
+This endpoint is served from PostgreSQL. On a cache miss or stale row, the API asks the Core service to refresh the wallet through NATS request/reply, then reads the committed state from PostgreSQL.
 
 ---
 

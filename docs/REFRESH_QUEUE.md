@@ -46,6 +46,8 @@ Wallets and wallet candidates enter or update the queue from several signals:
 - failed refresh retries
 - user API request cache miss
 
+Interactive API misses are sent to the Core service through NATS Core request/reply. Core reuses the same PostgreSQL leases and refresh path as scheduled work; the API never calls Hyperliquid directly. The NATS reconnect buffer is disabled so expired HTTP requests are not published after connectivity returns.
+
 Leaderboard candidates are scanned with `clearinghouseState` before becoming indexed wallets. A candidate is retained when either its real account value or the absolute value of one of its positions reaches the whale threshold.
 
 Each signal should update wallet or candidate metadata and then recompute priority.
@@ -312,13 +314,13 @@ The coverage deadline cannot be pushed forward by a leaderboard re-poll. Initial
 
 ## Rate Limiter
 
-The API process uses a fixed ticker. The default is:
+The Core process applies one shared limiter to scheduled and on-demand calls. The default is:
 
 ```txt
-rate: 7 clearinghouseState calls / second / process
+rate: 7 clearinghouseState calls / second / Core process
 ```
 
-PostgreSQL leases make multiple workers safe for deduplication, but the rate limit is process-local. Before deploying multiple API replicas behind the same egress IP, the global seven-per-second budget must be divided between replicas or moved to a shared limiter.
+PostgreSQL leases make multiple Core instances safe for deduplication, but the rate limit is process-local. Deploy one Core instance while it shares an egress IP; multiple API replicas are safe because they do not call Hyperliquid. Before scaling Core horizontally, move the limiter to shared state or divide the global budget between instances.
 
 ## Refresh Result Handling
 

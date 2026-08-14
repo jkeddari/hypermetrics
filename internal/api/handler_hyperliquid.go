@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jkeddari/hypermetrics/internal/corebus"
 	"github.com/jkeddari/hypermetrics/internal/hypercore"
 	apimodel "github.com/jkeddari/hypermetrics/internal/model/api"
 )
@@ -18,21 +19,21 @@ const defaultWalletPageSize = 100
 
 type HyperliquidAPIHandler struct {
 	store             *hypercore.Store
-	refresher         WalletRefresher
+	refreshRequester  WalletRefreshRequester
 	whaleThresholdUSD float64
 }
 
-type WalletRefresher interface {
-	RefreshWallet(ctx context.Context, address string) (hypercore.WalletState, error)
+type WalletRefreshRequester interface {
+	RequestWalletRefresh(ctx context.Context, address string) error
 }
 
-func NewHyperliquidAPIHandler(store *hypercore.Store, refresher WalletRefresher, whaleThresholdUSD float64) *HyperliquidAPIHandler {
+func NewHyperliquidAPIHandler(store *hypercore.Store, refreshRequester WalletRefreshRequester, whaleThresholdUSD float64) *HyperliquidAPIHandler {
 	if whaleThresholdUSD <= 0 {
 		whaleThresholdUSD = 1_000_000
 	}
 	return &HyperliquidAPIHandler{
 		store:             store,
-		refresher:         refresher,
+		refreshRequester:  refreshRequester,
 		whaleThresholdUSD: whaleThresholdUSD,
 	}
 }
@@ -168,13 +169,15 @@ func (h *HyperliquidAPIHandler) UserPosition(w http.ResponseWriter, r *http.Requ
 
 	state, err := h.store.GetWalletState(user)
 	if errors.Is(err, hypercore.ErrWalletNotFound) || err == nil && !walletStateFresh(state, time.Now().UTC()) {
-		state, err = h.refreshUserPosition(r.Context(), user)
-		if err != nil {
-			writeJSON(w, http.StatusBadGateway, apimodel.ResponseEnvelope[any]{
-				Code: "1005",
-				Msg:  "upstream unavailable while refreshing wallet position",
-				Data: nil,
-			})
+		refreshErr := h.refreshUserPosition(r.Context(), user)
+		refreshedState, refreshedErr := h.store.GetWalletState(user)
+		if refreshedErr == nil && walletStateFresh(refreshedState, time.Now().UTC()) {
+			state, err = refreshedState, nil
+		} else if refreshErr != nil {
+			writeRefreshError(w, refreshErr)
+			return
+		} else {
+			writeRefreshError(w, corebus.ErrRefreshFailed)
 			return
 		}
 	}
@@ -199,11 +202,25 @@ func walletStateFresh(state hypercore.WalletState, now time.Time) bool {
 	return !refreshedAt.IsZero() && now.Sub(refreshedAt) < hypercore.OnDemandFreshness
 }
 
-func (h *HyperliquidAPIHandler) refreshUserPosition(ctx context.Context, user string) (hypercore.WalletState, error) {
-	if h.refresher == nil {
-		return hypercore.WalletState{}, hypercore.ErrWalletNotFound
+func (h *HyperliquidAPIHandler) refreshUserPosition(ctx context.Context, user string) error {
+	if h.refreshRequester == nil {
+		return corebus.ErrCoreUnavailable
 	}
-	return h.refresher.RefreshWallet(ctx, user)
+	return h.refreshRequester.RequestWalletRefresh(ctx, user)
+}
+
+func writeRefreshError(w http.ResponseWriter, err error) {
+	status := http.StatusBadGateway
+	message := "upstream unavailable while refreshing wallet position"
+	switch {
+	case errors.Is(err, corebus.ErrCoreUnavailable):
+		status = http.StatusServiceUnavailable
+		message = "core service unavailable"
+	case errors.Is(err, corebus.ErrCoreTimeout):
+		status = http.StatusGatewayTimeout
+		message = "core service timed out while refreshing wallet position"
+	}
+	writeJSON(w, status, apimodel.ResponseEnvelope[any]{Code: "1005", Msg: message, Data: nil})
 }
 
 func (h *HyperliquidAPIHandler) Wallets(w http.ResponseWriter, r *http.Request) {

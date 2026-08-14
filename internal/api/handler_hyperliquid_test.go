@@ -14,6 +14,7 @@ import (
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/jkeddari/hypermetrics/internal/corebus"
 	"github.com/jkeddari/hypermetrics/internal/db"
 	"github.com/jkeddari/hypermetrics/internal/hypercore"
 	apimodel "github.com/jkeddari/hypermetrics/internal/model/api"
@@ -248,7 +249,7 @@ func TestUserPositionRefreshesAndStoresMissingWallet(t *testing.T) {
 		},
 	}
 
-	handler := NewHyperliquidAPIHandler(store, fakeWalletRefresher{
+	handler := NewHyperliquidAPIHandler(store, fakeWalletRefreshRequester{
 		store: store,
 		state: state,
 	}, 1_000_000)
@@ -282,6 +283,24 @@ func TestWalletStateFreshForFiveMinutes(t *testing.T) {
 	state.Account.RefreshedAt = now.Add(-5 * time.Minute)
 	if walletStateFresh(state, now) {
 		t.Fatal("expected state five minutes old to be stale")
+	}
+}
+
+func TestWriteRefreshErrorUsesServiceStatuses(t *testing.T) {
+	tests := []struct {
+		err  error
+		want int
+	}{
+		{corebus.ErrCoreUnavailable, http.StatusServiceUnavailable},
+		{corebus.ErrCoreTimeout, http.StatusGatewayTimeout},
+		{corebus.ErrRefreshFailed, http.StatusBadGateway},
+	}
+	for _, test := range tests {
+		recorder := httptest.NewRecorder()
+		writeRefreshError(recorder, test.err)
+		if recorder.Code != test.want {
+			t.Fatalf("expected %d, got %d", test.want, recorder.Code)
+		}
 	}
 }
 
@@ -327,22 +346,22 @@ func newTestHypercoreStore(t *testing.T) *hypercore.Store {
 
 var apiTestSchemaSequence atomic.Uint64
 
-type fakeWalletRefresher struct {
+type fakeWalletRefreshRequester struct {
 	store *hypercore.Store
 	state hypercore.WalletState
 	err   error
 }
 
-func (f fakeWalletRefresher) RefreshWallet(context.Context, string) (hypercore.WalletState, error) {
+func (f fakeWalletRefreshRequester) RequestWalletRefresh(context.Context, string) error {
 	if f.err != nil {
-		return hypercore.WalletState{}, f.err
+		return f.err
 	}
 
 	wallet := hypercore.ApplyRefreshSuccess(hypercore.Wallet{Address: f.state.Account.Address}, f.state, hypercore.PriorityConfig{
 		WhaleThresholdUSD: 1_000_000,
 	})
 	if err := f.store.SaveWalletState(wallet, f.state); err != nil {
-		return hypercore.WalletState{}, err
+		return err
 	}
-	return f.state, nil
+	return nil
 }
