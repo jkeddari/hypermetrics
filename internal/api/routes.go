@@ -9,19 +9,19 @@ import (
 
 func SetupRoutes(app *app.APIApp) http.Handler {
 	requireAPIKey := middleware.RequireAPIKey(app.APIKeyService)
-	hyperliquidAPI := NewHyperliquidAPIHandler(app.HypercoreStore, app.CoreClient, app.Cfg.HypercoreWhaleThresholdUSD)
+	hyperliquidAPI := newHyperliquidAPIHandler(app.HypercoreStore, app.CoreClient, app.Cfg.HypercoreWhaleThresholdUSD)
 
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("GET /api/hyperliquid/whale-alert", requireAPIKey(hyperliquidAPI.WhaleAlert))
-	mux.HandleFunc("GET /api/hyperliquid/whale-position", requireAPIKey(hyperliquidAPI.WhalePosition))
-	mux.HandleFunc("GET /api/hyperliquid/position", requireAPIKey(hyperliquidAPI.Position))
-	mux.HandleFunc("GET /api/hyperliquid/user-position", requireAPIKey(hyperliquidAPI.UserPosition))
-	mux.HandleFunc("GET /api/hyperliquid/wallet/overview", requireAPIKey(hyperliquidAPI.WalletOverview))
-	mux.HandleFunc("GET /api/hyperliquid/wallets", requireAPIKey(hyperliquidAPI.Wallets))
-	mux.HandleFunc("GET /api/hyperliquid/wallet/position-distribution", requireAPIKey(hyperliquidAPI.WalletPositionDistribution))
-	mux.HandleFunc("GET /api/hyperliquid/wallet/pnl-distribution", requireAPIKey(hyperliquidAPI.WalletPnLDistribution))
-	mux.HandleFunc("GET /api/hyperliquid/global-long-short-account-ratio/history", requireAPIKey(hyperliquidAPI.LongShortAccountRatioHistory))
+	mux.HandleFunc("GET /api/hyperliquid/whale-alert", requireAPIKey(hyperliquidAPI.whaleAlert))
+	mux.HandleFunc("GET /api/hyperliquid/whale-position", requireAPIKey(hyperliquidAPI.whalePosition))
+	mux.HandleFunc("GET /api/hyperliquid/position", requireAPIKey(hyperliquidAPI.position))
+	mux.HandleFunc("GET /api/hyperliquid/user-position", requireAPIKey(hyperliquidAPI.userPosition))
+	mux.HandleFunc("GET /api/hyperliquid/wallet/overview", requireAPIKey(hyperliquidAPI.walletOverview))
+	mux.HandleFunc("GET /api/hyperliquid/wallets", requireAPIKey(hyperliquidAPI.wallets))
+	mux.HandleFunc("GET /api/hyperliquid/wallet/position-distribution", requireAPIKey(hyperliquidAPI.walletPositionDistribution))
+	mux.HandleFunc("GET /api/hyperliquid/wallet/pnl-distribution", requireAPIKey(hyperliquidAPI.walletPnLDistribution))
+	mux.HandleFunc("GET /api/hyperliquid/global-long-short-account-ratio/history", requireAPIKey(hyperliquidAPI.longShortAccountRatioHistory))
 
 	return middleware.Chain(
 		mux,

@@ -15,13 +15,13 @@ const defaultLeaderboardURL = "https://stats-data.hyperliquid.xyz/Mainnet/leader
 
 var addressPattern = regexp.MustCompile(`(?i)^0x[0-9a-f]{40}$`)
 
-type Collector struct {
+type collector struct {
 	store      *Store
 	httpClient *http.Client
 	cfg        PriorityConfig
 }
 
-func NewCollector(store *Store, httpClient *http.Client) *Collector {
+func newCollector(store *Store, httpClient *http.Client) *collector {
 	if httpClient == nil {
 		httpClient = &http.Client{Timeout: 20 * time.Second}
 	}
@@ -29,14 +29,14 @@ func NewCollector(store *Store, httpClient *http.Client) *Collector {
 	if store != nil {
 		cfg = store.cfg
 	}
-	return &Collector{
+	return &collector{
 		store:      store,
 		httpClient: httpClient,
 		cfg:        cfg,
 	}
 }
 
-func (c *Collector) CollectLeaderboard(ctx context.Context, url string) (LeaderboardCollectStats, error) {
+func (c *collector) collectLeaderboard(ctx context.Context, url string) (LeaderboardCollectStats, error) {
 	if url == "" {
 		url = defaultLeaderboardURL
 	}
@@ -60,7 +60,7 @@ func (c *Collector) CollectLeaderboard(ctx context.Context, url string) (Leaderb
 		return LeaderboardCollectStats{}, fmt.Errorf("leaderboard status %d: %s", resp.StatusCode, string(body))
 	}
 
-	signals, err := ExtractLeaderboardSignals(body, time.Now().UTC())
+	signals, err := extractLeaderboardSignals(body, time.Now().UTC())
 	if err != nil {
 		return LeaderboardCollectStats{}, err
 	}
@@ -71,7 +71,7 @@ func (c *Collector) CollectLeaderboard(ctx context.Context, url string) (Leaderb
 			continue
 		}
 		stats.EligibleAddresses++
-		_, isNew, isExistingWallet, isRejected, err := c.store.UpsertLeaderboardCandidate(signal)
+		_, isNew, isExistingWallet, isRejected, err := c.store.upsertLeaderboardCandidate(signal)
 		if err != nil {
 			slog.Warn("failed to upsert leaderboard candidate", "address", signal.Address, "error", err)
 			continue
@@ -90,12 +90,12 @@ func (c *Collector) CollectLeaderboard(ctx context.Context, url string) (Leaderb
 	return stats, nil
 }
 
-func (c *Collector) RunLeaderboardPoller(ctx context.Context, url string, interval time.Duration) error {
+func (c *collector) runLeaderboardPoller(ctx context.Context, url string, interval time.Duration) error {
 	if interval <= 0 {
 		interval = 10 * time.Minute
 	}
 
-	if stats, err := c.CollectLeaderboard(ctx, url); err != nil {
+	if stats, err := c.collectLeaderboard(ctx, url); err != nil {
 		slog.Warn("leaderboard collection failed", "error", err)
 	} else {
 		slog.Info("leaderboard potential addresses collected",
@@ -115,7 +115,7 @@ func (c *Collector) RunLeaderboardPoller(ctx context.Context, url string, interv
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
-			stats, err := c.CollectLeaderboard(ctx, url)
+			stats, err := c.collectLeaderboard(ctx, url)
 			if err != nil {
 				slog.Warn("leaderboard collection failed", "error", err)
 				continue
@@ -131,7 +131,7 @@ func (c *Collector) RunLeaderboardPoller(ctx context.Context, url string, interv
 	}
 }
 
-func ExtractLeaderboardSignals(data []byte, seenAt time.Time) ([]WalletSignal, error) {
+func extractLeaderboardSignals(data []byte, seenAt time.Time) ([]WalletSignal, error) {
 	var payload any
 	if err := json.Unmarshal(data, &payload); err != nil {
 		return nil, err
@@ -201,9 +201,9 @@ func numberFromMap(values map[string]any, keys ...string) float64 {
 		case float64:
 			return typed
 		case string:
-			return ParseFloat(typed)
+			return parseFloat(typed)
 		case json.Number:
-			return ParseFloat(typed.String())
+			return parseFloat(typed.String())
 		}
 	}
 	return 0

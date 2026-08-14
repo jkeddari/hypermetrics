@@ -1,6 +1,7 @@
 package hypercore
 
 import (
+	"context"
 	"encoding/json"
 	"net"
 	"net/http"
@@ -86,4 +87,12 @@ func TestHyperliquidClientLoadsPerpsSpotAndOpenOrders(t *testing.T) {
 	if calls.Load() != 7 {
 		t.Fatalf("expected cached spot metadata after first refresh, got %d REST calls", calls.Load())
 	}
+}
+
+func NewHyperliquidClient(infoURL string, httpClient *http.Client) *hyperliquidClient {
+	return newHyperliquidClient(infoURL, httpClient)
+}
+
+func (c *hyperliquidClient) GetClearinghouseState(ctx context.Context, address string) (WalletState, error) {
+	return c.getClearinghouseState(ctx, address)
 }

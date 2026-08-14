@@ -11,7 +11,7 @@ import (
 )
 
 func RequireAPIKey(apiKeyService *service.APIKeyService) func(http.HandlerFunc) http.HandlerFunc {
-	limiter := NewRateLimiter(600, time.Minute)
+	limiter := newRateLimiter(600, time.Minute)
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			apiKey := strings.TrimSpace(r.Header.Get("HM-API-KEY"))
@@ -42,7 +42,7 @@ func RequireAPIKey(apiKeyService *service.APIKeyService) func(http.HandlerFunc) 
 				}
 				return
 			}
-			if !limiter.AllowLimit(key.ID, planRateLimit(key.PlanID)) {
+			if !limiter.allowLimit(key.ID, planRateLimit(key.PlanID)) {
 				w.Header().Set("Retry-After", "60")
 				writeAPIJSON(w, http.StatusTooManyRequests, apimodel.ResponseEnvelope[any]{
 					Code: "1007", Msg: "API rate limit exceeded", Data: nil,

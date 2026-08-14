@@ -20,14 +20,8 @@ type Config struct {
 type Service struct {
 	cfg       Config
 	store     *Store
-	collector *Collector
+	collector *collector
 	queue     *RefreshQueue
-}
-
-func New(cfg Config) *Service {
-	return &Service{
-		cfg: cfg,
-	}
 }
 
 func Open(cfg Config) (*Service, error) {
@@ -48,9 +42,9 @@ func Open(cfg Config) (*Service, error) {
 
 	store := OpenStore(cfg.DB, priorityCfg)
 
-	client := NewHyperliquidClient("", nil)
-	collector := NewCollector(store, &http.Client{Timeout: 20 * time.Second})
-	queue := NewRefreshQueue(store, client, QueueConfig{
+	client := newHyperliquidClient("", nil)
+	collector := newCollector(store, &http.Client{Timeout: 20 * time.Second})
+	queue := newRefreshQueue(store, client, QueueConfig{
 		RefreshRatePerSecond:  cfg.RefreshRatePerSecond,
 		UpstreamRequestWeight: 24,
 		StatsLogInterval:      cfg.StatsLogInterval,
@@ -65,37 +59,25 @@ func Open(cfg Config) (*Service, error) {
 	}, nil
 }
 
-func (s *Service) Store() *Store {
-	return s.store
-}
-
-func (s *Service) Collector() *Collector {
-	return s.collector
-}
-
-func (s *Service) Queue() *RefreshQueue {
-	return s.queue
-}
-
 func (s *Service) RefreshWallet(ctx context.Context, address string) (WalletState, error) {
-	return s.queue.RefreshWallet(ctx, address)
+	return s.queue.refreshWallet(ctx, address)
 }
 
 func (s *Service) Close() error {
 	if s == nil || s.store == nil {
 		return nil
 	}
-	return s.store.Close()
+	return s.store.close()
 }
 
 func (s *Service) RunCollectors(ctx context.Context) error {
 	errs := make(chan error, 2)
 
 	go func() {
-		errs <- s.collector.RunLeaderboardPoller(ctx, s.cfg.LeaderboardURL, s.cfg.LeaderboardInterval)
+		errs <- s.collector.runLeaderboardPoller(ctx, s.cfg.LeaderboardURL, s.cfg.LeaderboardInterval)
 	}()
 	go func() {
-		errs <- s.queue.Run(ctx)
+		errs <- s.queue.run(ctx)
 	}()
 
 	select {

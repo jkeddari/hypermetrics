@@ -9,9 +9,6 @@ import (
 	slogsentry "github.com/samber/slog-sentry/v2"
 )
 
-// Log is the global logger instance
-var Log *slog.Logger
-
 // Init configures structured logs and optional Sentry error reporting.
 func Init(sentryDSN string) {
 	handlers := []slog.Handler{slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
@@ -42,6 +39,5 @@ func Init(sentryDSN string) {
 		handler = handlers[0]
 	}
 
-	Log = slog.New(handler)
-	slog.SetDefault(Log)
+	slog.SetDefault(slog.New(handler))
 }

@@ -32,10 +32,10 @@ func TestPriorityScorePrefersKnownWhale(t *testing.T) {
 		HasOpenPosition:     true,
 	}
 
-	if ComputeTier(whale, cfg) != TierKnownWhale {
+	if computeTier(whale, cfg) != TierKnownWhale {
 		t.Fatalf("expected known whale tier")
 	}
-	if ComputePriorityScore(whale, cfg) <= ComputePriorityScore(cold, cfg) {
+	if computePriorityScore(whale, cfg) <= computePriorityScore(cold, cfg) {
 		t.Fatalf("expected known whale score to beat cold wallet")
 	}
 }
@@ -67,12 +67,12 @@ func TestPriorityScorePrefersUnscannedHighAccountValue(t *testing.T) {
 		AccountValue:            1_500_000,
 	}
 
-	if ComputePriorityScore(unscannedHighValue, cfg) <= ComputePriorityScore(knownWhale, cfg) {
+	if computePriorityScore(unscannedHighValue, cfg) <= computePriorityScore(knownWhale, cfg) {
 		t.Fatalf("expected unscanned high account value wallet to beat known whale")
 	}
 
 	expectedMinimum := 10_000 + 1_500
-	if ComputePriorityScore(unscannedHighValue, cfg) < float64(expectedMinimum) {
+	if computePriorityScore(unscannedHighValue, cfg) < float64(expectedMinimum) {
 		t.Fatalf("expected proportional unscanned value score to be included")
 	}
 }
@@ -157,7 +157,7 @@ func TestFailedUnscannedHighValueWalletBacksOff(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wallet = ApplyRefreshFailure(wallet, context.DeadlineExceeded, cfg)
+	wallet = applyRefreshFailure(wallet, context.DeadlineExceeded, cfg)
 	if err := store.SaveWallet(wallet); err != nil {
 		t.Fatal(err)
 	}
@@ -202,7 +202,7 @@ func TestLeaderboardRepollMakesUnscannedHighValueWalletDue(t *testing.T) {
 		NextRefreshAt: now.Add(time.Hour),
 	}
 
-	wallet = MergeWalletSignal(wallet, WalletSignal{
+	wallet = mergeWalletSignal(wallet, WalletSignal{
 		Address:                 wallet.Address,
 		Source:                  SourceLeaderboard,
 		SeenAt:                  now,
@@ -231,7 +231,7 @@ func TestLeaderboardRepollKeepsFailedHighValueWalletBackoff(t *testing.T) {
 		NextRefreshAt:      nextRefreshAt,
 	}
 
-	wallet = MergeWalletSignal(wallet, WalletSignal{
+	wallet = mergeWalletSignal(wallet, WalletSignal{
 		Address:                 wallet.Address,
 		Source:                  SourceLeaderboard,
 		SeenAt:                  now,
@@ -261,7 +261,7 @@ func TestMaxRefreshIntervalCapsCoverageDelay(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if got := MaxRefreshInterval(test.wallet, cfg); got != test.want {
+			if got := maxRefreshInterval(test.wallet, cfg); got != test.want {
 				t.Fatalf("expected %s, got %s", test.want, got)
 			}
 		})
@@ -275,7 +275,7 @@ func TestIsTrackableStateAcceptsWhalePositionWithSmallAccount(t *testing.T) {
 			{PositionValueUSD: -1_200_000},
 		},
 	}
-	if !IsTrackableState(state, 1_000_000) {
+	if !isTrackableState(state, 1_000_000) {
 		t.Fatal("expected absolute whale position value to make wallet trackable")
 	}
 }
@@ -355,7 +355,7 @@ func TestRefreshQueueRefreshOneRetainsIndexedWalletBelowThreshold(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	wallet = ApplyRefreshSuccess(wallet, WalletState{
+	wallet = applyRefreshSuccess(wallet, WalletState{
 		Account: WalletAccount{
 			Address:      address,
 			AccountValue: 1_500_000,
@@ -782,7 +782,7 @@ type fakeWalletStateClient struct {
 	err   error
 }
 
-func (c fakeWalletStateClient) GetClearinghouseState(context.Context, string) (WalletState, error) {
+func (c fakeWalletStateClient) getClearinghouseState(context.Context, string) (WalletState, error) {
 	return c.state, c.err
 }
 
@@ -792,7 +792,7 @@ type recordingWalletStateClient struct {
 	now       time.Time
 }
 
-func (c *recordingWalletStateClient) GetClearinghouseState(_ context.Context, address string) (WalletState, error) {
+func (c *recordingWalletStateClient) getClearinghouseState(_ context.Context, address string) (WalletState, error) {
 	c.mu.Lock()
 	c.addresses = append(c.addresses, address)
 	c.mu.Unlock()
@@ -814,7 +814,7 @@ type countingWalletStateClient struct {
 	calls atomic.Int64
 }
 
-func (c *countingWalletStateClient) GetClearinghouseState(_ context.Context, address string) (WalletState, error) {
+func (c *countingWalletStateClient) getClearinghouseState(_ context.Context, address string) (WalletState, error) {
 	c.calls.Add(1)
 	time.Sleep(75 * time.Millisecond)
 	now := time.Now().UTC()
@@ -826,4 +826,16 @@ func (c *countingWalletStateClient) GetClearinghouseState(_ context.Context, add
 			RawReceivedAt: now,
 		},
 	}, nil
+}
+
+func NewRefreshQueue(store *Store, client walletStateClient, cfg QueueConfig) *RefreshQueue {
+	return newRefreshQueue(store, client, cfg)
+}
+
+func (q *RefreshQueue) RefreshOne(ctx context.Context) (bool, error) {
+	return q.refreshOne(ctx)
+}
+
+func (q *RefreshQueue) RefreshWallet(ctx context.Context, address string) (WalletState, error) {
+	return q.refreshWallet(ctx, address)
 }

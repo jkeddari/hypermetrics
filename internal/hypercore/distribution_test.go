@@ -155,7 +155,7 @@ func saveDistributionWallet(
 		},
 		Positions: positions,
 	}
-	wallet := ApplyRefreshSuccess(Wallet{
+	wallet := applyRefreshSuccess(Wallet{
 		Address:     address,
 		FirstSeenAt: now,
 	}, state, cfg)

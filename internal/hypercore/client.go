@@ -16,11 +16,11 @@ import (
 const defaultInfoURL = "https://api.hyperliquid.xyz/info"
 const spotMetadataCacheTTL = time.Minute
 
-type WalletStateClient interface {
-	GetClearinghouseState(ctx context.Context, address string) (WalletState, error)
+type walletStateClient interface {
+	getClearinghouseState(ctx context.Context, address string) (WalletState, error)
 }
 
-type HyperliquidClient struct {
+type hyperliquidClient struct {
 	infoURL        string
 	httpClient     *http.Client
 	spotMetadataMu sync.Mutex
@@ -29,20 +29,20 @@ type HyperliquidClient struct {
 	spotMetadataAt time.Time
 }
 
-func NewHyperliquidClient(infoURL string, httpClient *http.Client) *HyperliquidClient {
+func newHyperliquidClient(infoURL string, httpClient *http.Client) *hyperliquidClient {
 	if infoURL == "" {
 		infoURL = defaultInfoURL
 	}
 	if httpClient == nil {
 		httpClient = &http.Client{Timeout: 15 * time.Second}
 	}
-	return &HyperliquidClient{
+	return &hyperliquidClient{
 		infoURL:    infoURL,
 		httpClient: httpClient,
 	}
 }
 
-func (c *HyperliquidClient) GetClearinghouseState(ctx context.Context, address string) (WalletState, error) {
+func (c *hyperliquidClient) getClearinghouseState(ctx context.Context, address string) (WalletState, error) {
 	address = NormalizeAddress(address)
 	if !IsAddress(address) {
 		return WalletState{}, fmt.Errorf("invalid wallet address: %q", address)
@@ -91,7 +91,7 @@ func (c *HyperliquidClient) GetClearinghouseState(ctx context.Context, address s
 	return state, nil
 }
 
-func (c *HyperliquidClient) info(ctx context.Context, payload any, result any) error {
+func (c *hyperliquidClient) info(ctx context.Context, payload any, result any) error {
 	requestBody, err := json.Marshal(payload)
 	if err != nil {
 		return err
@@ -185,7 +185,7 @@ type frontendOpenOrderResponse struct {
 	TriggerPx        string `json:"triggerPx"`
 }
 
-func (c *HyperliquidClient) getSpotMetadata(ctx context.Context) ([]SpotToken, []SpotMarket, error) {
+func (c *hyperliquidClient) getSpotMetadata(ctx context.Context) ([]SpotToken, []SpotMarket, error) {
 	c.spotMetadataMu.Lock()
 	if !c.spotMetadataAt.IsZero() && time.Since(c.spotMetadataAt) < spotMetadataCacheTTL {
 		tokens := append([]SpotToken(nil), c.spotTokens...)
@@ -272,8 +272,8 @@ func mapSpotBalances(address string, balances []spotBalanceResponse, markets []S
 
 	result := make([]SpotBalance, 0, len(balances))
 	for _, balance := range balances {
-		total := ParseFloat(balance.Total)
-		entryNtl := ParseFloat(balance.EntryNtl)
+		total := parseFloat(balance.Total)
+		entryNtl := parseFloat(balance.EntryNtl)
 		markPrice := prices[balance.Token]
 		valueUSD := total * markPrice
 		unrealizedPnL := 0.0
@@ -282,7 +282,7 @@ func mapSpotBalances(address string, balances []spotBalanceResponse, markets []S
 		}
 		result = append(result, SpotBalance{
 			Address: address, Token: balance.Token, Coin: balance.Coin,
-			Hold: ParseFloat(balance.Hold), Total: total, EntryNtl: entryNtl,
+			Hold: parseFloat(balance.Hold), Total: total, EntryNtl: entryNtl,
 			MarkPrice: markPrice, ValueUSD: valueUSD,
 			UnrealizedPnL: unrealizedPnL, RefreshedAt: refreshedAt,
 		})
@@ -305,11 +305,11 @@ func mapOpenOrders(address string, orders []frontendOpenOrderResponse, markets [
 		result = append(result, WalletOpenOrder{
 			Address: address, OID: order.OID, ClientOID: order.ClientOID,
 			Coin: order.Coin, MarketType: marketType, Side: order.Side,
-			OrderType: order.OrderType, LimitPrice: ParseFloat(order.LimitPx),
-			Size: ParseFloat(order.Size), OriginalSize: ParseFloat(order.OriginalSize),
+			OrderType: order.OrderType, LimitPrice: parseFloat(order.LimitPx),
+			Size: parseFloat(order.Size), OriginalSize: parseFloat(order.OriginalSize),
 			ReduceOnly: order.ReduceOnly, IsTrigger: order.IsTrigger,
 			IsPositionTPSL: order.IsPositionTPSL, TriggerCondition: order.TriggerCondition,
-			TriggerPrice: ParseFloat(order.TriggerPx), OrderTimestamp: order.Timestamp,
+			TriggerPrice: parseFloat(order.TriggerPx), OrderTimestamp: order.Timestamp,
 			RefreshedAt: refreshedAt,
 		})
 	}
@@ -322,7 +322,7 @@ func parseJSONFloat(raw json.RawMessage) float64 {
 	}
 	var stringValue string
 	if err := json.Unmarshal(raw, &stringValue); err == nil {
-		return ParseFloat(stringValue)
+		return parseFloat(stringValue)
 	}
 	var numberValue float64
 	if err := json.Unmarshal(raw, &numberValue); err == nil {
@@ -367,13 +367,13 @@ type clearinghouseAssetPosition struct {
 }
 
 func (r clearinghouseStateResponse) toWalletState(address string, receivedAt time.Time) WalletState {
-	accountValue := ParseFloat(r.MarginSummary.AccountValue)
-	marginUsed := ParseFloat(r.MarginSummary.TotalMarginUsed)
+	accountValue := parseFloat(r.MarginSummary.AccountValue)
+	marginUsed := parseFloat(r.MarginSummary.TotalMarginUsed)
 	if accountValue == 0 && r.CrossMarginSummary.AccountValue != "" {
-		accountValue = ParseFloat(r.CrossMarginSummary.AccountValue)
+		accountValue = parseFloat(r.CrossMarginSummary.AccountValue)
 	}
 	if marginUsed == 0 && r.CrossMarginSummary.TotalMarginUsed != "" {
-		marginUsed = ParseFloat(r.CrossMarginSummary.TotalMarginUsed)
+		marginUsed = parseFloat(r.CrossMarginSummary.TotalMarginUsed)
 	}
 
 	state := WalletState{
@@ -381,7 +381,7 @@ func (r clearinghouseStateResponse) toWalletState(address string, receivedAt tim
 			Address:       address,
 			AccountValue:  accountValue,
 			MarginUsed:    marginUsed,
-			Withdrawable:  ParseFloat(r.Withdrawable),
+			Withdrawable:  parseFloat(r.Withdrawable),
 			RefreshedAt:   receivedAt,
 			RawReceivedAt: receivedAt,
 		},
@@ -389,12 +389,12 @@ func (r clearinghouseStateResponse) toWalletState(address string, receivedAt tim
 	}
 
 	for _, asset := range r.AssetPositions {
-		size := ParseFloat(asset.Position.Szi)
+		size := parseFloat(asset.Position.Szi)
 		if size == 0 {
 			continue
 		}
 
-		positionValue := math.Abs(ParseFloat(asset.Position.PositionValue))
+		positionValue := math.Abs(parseFloat(asset.Position.PositionValue))
 		markPrice := 0.0
 		if size != 0 {
 			markPrice = positionValue / math.Abs(size)
@@ -404,13 +404,13 @@ func (r clearinghouseStateResponse) toWalletState(address string, receivedAt tim
 			Address:          address,
 			Symbol:           strings.ToUpper(asset.Position.Coin),
 			PositionSize:     size,
-			EntryPrice:       ParseFloat(asset.Position.EntryPx),
+			EntryPrice:       parseFloat(asset.Position.EntryPx),
 			MarkPrice:        markPrice,
-			LiqPrice:         ParseFloat(asset.Position.LiquidationPx),
+			LiqPrice:         parseFloat(asset.Position.LiquidationPx),
 			Leverage:         asset.Position.Leverage.Value,
-			MarginBalance:    ParseFloat(asset.Position.MarginUsed),
+			MarginBalance:    parseFloat(asset.Position.MarginUsed),
 			PositionValueUSD: positionValue,
-			UnrealizedPnL:    ParseFloat(asset.Position.UnrealizedPnL),
+			UnrealizedPnL:    parseFloat(asset.Position.UnrealizedPnL),
 			RefreshedAt:      receivedAt,
 		})
 	}

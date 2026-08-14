@@ -42,11 +42,11 @@ func OpenStore(db *sql.DB, cfg PriorityConfig) *Store {
 	return &Store{db: db, cfg: cfg}
 }
 
-func (s *Store) Close() error {
+func (s *Store) close() error {
 	return nil
 }
 
-func (s *Store) UpsertWalletSignal(signal WalletSignal) (Wallet, error) {
+func (s *Store) upsertWalletSignal(signal WalletSignal) (Wallet, error) {
 	if s == nil || s.db == nil {
 		return Wallet{}, ErrStoreUnavailable
 	}
@@ -69,7 +69,7 @@ func (s *Store) UpsertWalletSignal(signal WalletSignal) (Wallet, error) {
 	if err != nil && !errors.Is(err, ErrWalletNotFound) {
 		return Wallet{}, err
 	}
-	wallet = MergeWalletSignal(wallet, signal, s.cfg)
+	wallet = mergeWalletSignal(wallet, signal, s.cfg)
 	if err := upsertWallet(ctx, tx, wallet); err != nil {
 		return Wallet{}, err
 	}
@@ -88,7 +88,7 @@ func (s *Store) UpsertWalletSignal(signal WalletSignal) (Wallet, error) {
 	return wallet, nil
 }
 
-func (s *Store) UpsertLeaderboardCandidate(signal WalletSignal) (WalletCandidate, bool, bool, bool, error) {
+func (s *Store) upsertLeaderboardCandidate(signal WalletSignal) (WalletCandidate, bool, bool, bool, error) {
 	if s == nil || s.db == nil {
 		return WalletCandidate{}, false, false, false, ErrStoreUnavailable
 	}
@@ -116,7 +116,7 @@ func (s *Store) UpsertLeaderboardCandidate(signal WalletSignal) (WalletCandidate
 
 	wallet, err := getWallet(ctx, tx, signal.Address)
 	if err == nil {
-		wallet = MergeWalletSignal(wallet, signal, s.cfg)
+		wallet = mergeWalletSignal(wallet, signal, s.cfg)
 		if err := upsertWallet(ctx, tx, wallet); err != nil {
 			return WalletCandidate{}, false, false, false, err
 		}
@@ -167,7 +167,7 @@ func (s *Store) UpsertLeaderboardCandidate(signal WalletSignal) (WalletCandidate
 		candidate.LeaderboardAccountValue = signal.LeaderboardAccountValue
 		candidate.LeaderboardPNL = signal.LeaderboardPNL
 		candidate.LeaderboardROI = signal.LeaderboardROI
-		candidate.PriorityScore = ComputeCandidatePriorityScore(candidate, s.cfg)
+		candidate.PriorityScore = computeCandidatePriorityScore(candidate, s.cfg)
 	}
 	if err := upsertCandidate(ctx, tx, candidate, candidatePending, time.Time{}, time.Time{}, 0, ""); err != nil {
 		return WalletCandidate{}, false, false, false, err
@@ -188,7 +188,7 @@ func (s *Store) GetWallet(address string) (Wallet, error) {
 	return getWallet(context.Background(), s.db, NormalizeAddress(address))
 }
 
-func (s *Store) GetCandidate(address string) (WalletCandidate, error) {
+func (s *Store) getCandidate(address string) (WalletCandidate, error) {
 	if s == nil || s.db == nil {
 		return WalletCandidate{}, ErrStoreUnavailable
 	}
@@ -202,7 +202,7 @@ func (s *Store) GetCandidate(address string) (WalletCandidate, error) {
 	return candidate, nil
 }
 
-func (s *Store) SaveWallet(wallet Wallet) error {
+func (s *Store) saveWallet(wallet Wallet) error {
 	if s == nil || s.db == nil {
 		return ErrStoreUnavailable
 	}
@@ -280,7 +280,7 @@ func (s *Store) SaveWalletState(wallet Wallet, state WalletState) error {
 		return err
 	}
 	if candidate, status, _, err := getCandidate(ctx, tx, wallet.Address); err == nil && status == candidatePending {
-		wallet = MergeWalletSignal(wallet, CandidateWalletSignal(candidate), s.cfg)
+		wallet = mergeWalletSignal(wallet, candidateWalletSignal(candidate), s.cfg)
 	} else if err != nil && !errors.Is(err, ErrWalletNotFound) {
 		return err
 	}
@@ -519,7 +519,7 @@ func saveOpenOrders(ctx context.Context, tx *sql.Tx, address string, orders []Wa
 	return nil
 }
 
-func (s *Store) RejectCandidate(candidate WalletCandidate, realAccountValue float64, reason string) error {
+func (s *Store) rejectCandidate(candidate WalletCandidate, realAccountValue float64, reason string) error {
 	if s == nil || s.db == nil {
 		return ErrStoreUnavailable
 	}
@@ -551,7 +551,7 @@ func (s *Store) RejectCandidate(candidate WalletCandidate, realAccountValue floa
 	return tx.Commit()
 }
 
-func (s *Store) SaveCandidate(candidate WalletCandidate) error {
+func (s *Store) saveCandidate(candidate WalletCandidate) error {
 	if s == nil || s.db == nil {
 		return ErrStoreUnavailable
 	}
@@ -573,7 +573,7 @@ func (s *Store) SaveCandidate(candidate WalletCandidate) error {
 	} else if err != nil && !errors.Is(err, ErrWalletNotFound) {
 		return err
 	}
-	candidate.PriorityScore = ComputeCandidatePriorityScore(candidate, s.cfg)
+	candidate.PriorityScore = computeCandidatePriorityScore(candidate, s.cfg)
 	if err := upsertCandidate(ctx, tx, candidate, candidatePending, time.Time{}, time.Time{}, 0, ""); err != nil {
 		return err
 	}
@@ -947,44 +947,6 @@ func (s *Store) ListWhaleAlerts(limit int) ([]WhaleAlert, error) {
 	return alerts, rows.Err()
 }
 
-func (s *Store) ListPositions() ([]WalletPosition, error) {
-	return s.listPositions(context.Background(), `ORDER BY position_value_usd DESC, wallet_address`)
-}
-
-func (s *Store) ListCandidates() ([]WalletCandidate, error) {
-	if s == nil || s.db == nil {
-		return nil, ErrStoreUnavailable
-	}
-	rows, err := s.db.Query(`
-		SELECT address, first_seen_at, last_seen_leaderboard_at, next_scan_at,
-			scan_attempts, consecutive_failures, last_error, leaderboard_rank,
-			leaderboard_account_value, leaderboard_pnl, leaderboard_roi, priority_score
-		FROM wallet_candidates
-		WHERE status = $1
-		ORDER BY priority_score DESC, leaderboard_account_value DESC, address`, candidatePending)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var candidates []WalletCandidate
-	for rows.Next() {
-		var candidate WalletCandidate
-		if err := rows.Scan(
-			&candidate.Address, &candidate.FirstSeenAt, &candidate.LastSeenLeaderboardAt, &candidate.NextScanAt,
-			&candidate.ScanAttempts, &candidate.ConsecutiveFailure, &candidate.LastError, &candidate.LeaderboardRank,
-			&candidate.LeaderboardAccountValue, &candidate.LeaderboardPNL, &candidate.LeaderboardROI, &candidate.PriorityScore,
-		); err != nil {
-			return nil, err
-		}
-		candidates = append(candidates, candidate)
-	}
-	return candidates, rows.Err()
-}
-
-func (s *Store) ListWallets() ([]Wallet, error) {
-	return s.listWallets(context.Background(), "")
-}
-
 func (s *Store) ListWalletsPage(currentPage, pageSize int) ([]Wallet, error) {
 	if pageSize <= 0 {
 		pageSize = 100
@@ -995,13 +957,7 @@ func (s *Store) ListWalletsPage(currentPage, pageSize int) ([]Wallet, error) {
 	return s.listWallets(context.Background(), `LIMIT $1 OFFSET $2`, pageSize, (currentPage-1)*pageSize)
 }
 
-func (s *Store) CountWallets() (int, error) {
-	var count int
-	err := s.db.QueryRow(`SELECT count(*) FROM wallets`).Scan(&count)
-	return count, err
-}
-
-func (s *Store) ClaimNextJob(workerID string, coverage bool, lease time.Duration) (RefreshJob, bool, error) {
+func (s *Store) claimNextJob(workerID string, coverage bool, lease time.Duration) (RefreshJob, bool, error) {
 	if s == nil || s.db == nil {
 		return RefreshJob{}, false, ErrStoreUnavailable
 	}
@@ -1044,7 +1000,7 @@ func (s *Store) ClaimNextJob(workerID string, coverage bool, lease time.Duration
 	return job, true, nil
 }
 
-func (s *Store) ClaimOnDemand(address, workerID string, lease time.Duration) (bool, error) {
+func (s *Store) claimOnDemand(address, workerID string, lease time.Duration) (bool, error) {
 	now := s.cfg.now()
 	result, err := s.db.Exec(`
 		UPDATE wallet_refresh_queue
@@ -1060,7 +1016,7 @@ func (s *Store) ClaimOnDemand(address, workerID string, lease time.Duration) (bo
 	return claimed == 1, err
 }
 
-func (s *Store) ReleaseJob(address, workerID string) error {
+func (s *Store) releaseJob(address, workerID string) error {
 	_, err := s.db.Exec(`
 		UPDATE wallet_refresh_queue
 		SET locked_until = NULL, locked_by = NULL, updated_at = $1
@@ -1292,7 +1248,7 @@ func enqueueWallet(ctx context.Context, tx *sql.Tx, wallet Wallet, cfg PriorityC
 	if next.IsZero() {
 		next = cfg.now()
 	}
-	deadline := next.Add(MaxRefreshInterval(wallet, cfg))
+	deadline := next.Add(maxRefreshInterval(wallet, cfg))
 	_, err := tx.ExecContext(ctx, `
 		INSERT INTO wallet_refresh_queue (
 			wallet_address, job_kind, next_refresh_at, refresh_deadline_at,

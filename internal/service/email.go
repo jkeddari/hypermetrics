@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-type EmailSender struct {
+type emailSender struct {
 	apiKey     string
 	from       string
 	resendURL  string
@@ -21,14 +21,14 @@ type EmailSender struct {
 	devMode    bool
 }
 
-func NewEmailSender(apiKey, from string, devMode bool) *EmailSender {
-	return &EmailSender{
+func newEmailSender(apiKey, from string, devMode bool) *emailSender {
+	return &emailSender{
 		apiKey: apiKey, from: from, devMode: devMode,
 		resendURL: "https://api.resend.com/emails", httpClient: &http.Client{Timeout: 10 * time.Second},
 	}
 }
 
-func (s *EmailSender) Send(ctx context.Context, to, subject, textBody string, htmlBody ...string) error {
+func (s *emailSender) send(ctx context.Context, to, subject, textBody string, htmlBody ...string) error {
 	if s.apiKey == "" || s.from == "" {
 		if s.devMode {
 			slog.Info("email skipped (development)", "to", to, "subject", subject, "body", textBody)

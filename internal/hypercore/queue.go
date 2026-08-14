@@ -21,7 +21,7 @@ type QueueConfig struct {
 
 type RefreshQueue struct {
 	store       *Store
-	client      WalletStateClient
+	client      walletStateClient
 	cfg         QueueConfig
 	stats       RefreshQueueStats
 	workerID    string
@@ -39,7 +39,7 @@ type RefreshQueueStats struct {
 	IdleTicks         int
 }
 
-func NewRefreshQueue(store *Store, client WalletStateClient, cfg QueueConfig) *RefreshQueue {
+func newRefreshQueue(store *Store, client walletStateClient, cfg QueueConfig) *RefreshQueue {
 	if cfg.RefreshRatePerSecond <= 0 {
 		cfg.RefreshRatePerSecond = 7
 	}
@@ -74,7 +74,7 @@ func NewRefreshQueue(store *Store, client WalletStateClient, cfg QueueConfig) *R
 
 var queueWorkerSequence atomic.Uint64
 
-func (q *RefreshQueue) Run(ctx context.Context) error {
+func (q *RefreshQueue) run(ctx context.Context) error {
 	interval := time.Duration(float64(time.Second) / q.cfg.RefreshRatePerSecond)
 	if interval <= 0 {
 		interval = time.Second
@@ -93,7 +93,7 @@ func (q *RefreshQueue) Run(ctx context.Context) error {
 		case <-statsTicker.C:
 			q.logAndResetStats()
 		case <-ticker.C:
-			refreshed, err := q.RefreshOne(ctx)
+			refreshed, err := q.refreshOne(ctx)
 			if err != nil {
 				q.stats.RefreshFailed++
 				slog.Warn("wallet refresh failed", "error", err)
@@ -111,22 +111,22 @@ func (q *RefreshQueue) Run(ctx context.Context) error {
 	}
 }
 
-func (q *RefreshQueue) RefreshOne(ctx context.Context) (bool, error) {
+func (q *RefreshQueue) refreshOne(ctx context.Context) (bool, error) {
 	claimNumber := atomic.AddUint64(&q.claimNumber, 1)
 	coverage := claimNumber%5 == 0
 	leaseID := q.nextLeaseID()
-	job, found, err := q.store.ClaimNextJob(leaseID, coverage, q.cfg.RequestTimeout+5*time.Second)
+	job, found, err := q.store.claimNextJob(leaseID, coverage, q.cfg.RequestTimeout+5*time.Second)
 	if err != nil || !found {
 		return false, err
 	}
 	defer func() {
-		if err := q.store.ReleaseJob(job.Address, leaseID); err != nil {
+		if err := q.store.releaseJob(job.Address, leaseID); err != nil {
 			slog.Warn("failed to release refresh lease", "address", job.Address, "error", err)
 		}
 	}()
 
 	if job.Kind == jobCandidate {
-		candidate, err := q.store.GetCandidate(job.Address)
+		candidate, err := q.store.getCandidate(job.Address)
 		if err != nil {
 			return true, err
 		}
@@ -142,14 +142,14 @@ func (q *RefreshQueue) RefreshOne(ctx context.Context) (bool, error) {
 	}
 	state, err := q.getClearinghouseState(requestCtx, wallet.Address)
 	if err != nil {
-		wallet = ApplyRefreshFailure(wallet, err, q.cfg.Priority)
-		if saveErr := q.store.SaveWallet(wallet); saveErr != nil {
+		wallet = applyRefreshFailure(wallet, err, q.cfg.Priority)
+		if saveErr := q.store.saveWallet(wallet); saveErr != nil {
 			return true, saveErr
 		}
 		return true, err
 	}
 
-	wallet = ApplyRefreshSuccess(wallet, state, q.cfg.Priority)
+	wallet = applyRefreshSuccess(wallet, state, q.cfg.Priority)
 	if err := q.store.SaveWalletState(wallet, state); err != nil {
 		return true, err
 	}
@@ -168,22 +168,22 @@ func (q *RefreshQueue) refreshCandidate(ctx context.Context, candidate WalletCan
 		candidate.ConsecutiveFailure++
 		candidate.LastError = err.Error()
 		candidate.NextScanAt = q.cfg.Priority.now().Add(time.Duration(1<<min(candidate.ConsecutiveFailure, 6)) * time.Minute)
-		if saveErr := q.store.SaveCandidate(candidate); saveErr != nil {
+		if saveErr := q.store.saveCandidate(candidate); saveErr != nil {
 			return true, saveErr
 		}
 		return true, err
 	}
 
-	if !IsTrackableState(state, q.cfg.Priority.whaleThreshold()) {
-		if err := q.store.RejectCandidate(candidate, state.Account.AccountValue, "account_and_positions_below_threshold"); err != nil {
+	if !isTrackableState(state, q.cfg.Priority.whaleThreshold()) {
+		if err := q.store.rejectCandidate(candidate, state.Account.AccountValue, "account_and_positions_below_threshold"); err != nil {
 			return true, err
 		}
 		q.stats.CandidateRejected++
 		return true, nil
 	}
 
-	wallet := MergeWalletSignal(Wallet{}, CandidateWalletSignal(candidate), q.cfg.Priority)
-	wallet = ApplyRefreshSuccess(wallet, state, q.cfg.Priority)
+	wallet := mergeWalletSignal(Wallet{}, candidateWalletSignal(candidate), q.cfg.Priority)
+	wallet = applyRefreshSuccess(wallet, state, q.cfg.Priority)
 	if err := q.store.SaveWalletState(wallet, state); err != nil {
 		return true, err
 	}
@@ -215,7 +215,7 @@ func (q *RefreshQueue) logAndResetStats() {
 	q.stats = RefreshQueueStats{}
 }
 
-func (q *RefreshQueue) RefreshWallet(ctx context.Context, address string) (WalletState, error) {
+func (q *RefreshQueue) refreshWallet(ctx context.Context, address string) (WalletState, error) {
 	address = NormalizeAddress(address)
 	cached, cachedErr := q.store.GetWalletState(address)
 	if cachedErr == nil && q.cfg.Priority.now().Sub(cached.Account.RefreshedAt) < OnDemandFreshness {
@@ -225,7 +225,7 @@ func (q *RefreshQueue) RefreshWallet(ctx context.Context, address string) (Walle
 		return WalletState{}, cachedErr
 	}
 
-	wallet, err := q.store.UpsertWalletSignal(WalletSignal{
+	wallet, err := q.store.upsertWalletSignal(WalletSignal{
 		Address: address,
 		Source:  SourceManual,
 		SeenAt:  q.cfg.Priority.now(),
@@ -235,7 +235,7 @@ func (q *RefreshQueue) RefreshWallet(ctx context.Context, address string) (Walle
 	}
 
 	leaseID := q.nextLeaseID()
-	claimed, err := q.store.ClaimOnDemand(address, leaseID, q.cfg.RequestTimeout+5*time.Second)
+	claimed, err := q.store.claimOnDemand(address, leaseID, q.cfg.RequestTimeout+5*time.Second)
 	if err != nil {
 		return WalletState{}, err
 	}
@@ -245,7 +245,7 @@ func (q *RefreshQueue) RefreshWallet(ctx context.Context, address string) (Walle
 		return q.waitForWalletRefresh(waitCtx, address, cached, cachedErr == nil)
 	}
 	defer func() {
-		if err := q.store.ReleaseJob(address, leaseID); err != nil {
+		if err := q.store.releaseJob(address, leaseID); err != nil {
 			slog.Warn("failed to release on-demand lease", "address", address, "error", err)
 		}
 	}()
@@ -255,14 +255,14 @@ func (q *RefreshQueue) RefreshWallet(ctx context.Context, address string) (Walle
 
 	state, err := q.getClearinghouseState(requestCtx, address)
 	if err != nil {
-		wallet = ApplyRefreshFailure(wallet, err, q.cfg.Priority)
-		if saveErr := q.store.SaveWallet(wallet); saveErr != nil {
+		wallet = applyRefreshFailure(wallet, err, q.cfg.Priority)
+		if saveErr := q.store.saveWallet(wallet); saveErr != nil {
 			return WalletState{}, saveErr
 		}
 		return WalletState{}, err
 	}
 
-	wallet = ApplyRefreshSuccess(wallet, state, q.cfg.Priority)
+	wallet = applyRefreshSuccess(wallet, state, q.cfg.Priority)
 	if err := q.store.SaveWalletState(wallet, state); err != nil {
 		return WalletState{}, err
 	}
@@ -274,7 +274,7 @@ func (q *RefreshQueue) getClearinghouseState(ctx context.Context, address string
 	if err := q.waitForRequestSlot(ctx); err != nil {
 		return WalletState{}, err
 	}
-	return q.client.GetClearinghouseState(ctx, address)
+	return q.client.getClearinghouseState(ctx, address)
 }
 
 func (q *RefreshQueue) waitForRequestSlot(ctx context.Context) error {

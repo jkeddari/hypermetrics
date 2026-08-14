@@ -83,17 +83,6 @@ type WalletCandidate struct {
 	PriorityScore           float64 `json:"priority_score"`
 }
 
-type RejectedWalletCandidate struct {
-	Address string `json:"address"`
-
-	RejectedAt              time.Time `json:"rejected_at"`
-	LastSeenLeaderboardAt   time.Time `json:"last_seen_leaderboard_at"`
-	LeaderboardRank         int       `json:"leaderboard_rank,omitempty"`
-	LeaderboardAccountValue float64   `json:"leaderboard_account_value"`
-	RealAccountValue        float64   `json:"real_account_value"`
-	Reason                  string    `json:"reason"`
-}
-
 type LeaderboardCollectStats struct {
 	EligibleAddresses     int
 	NewPotentialAddresses int
@@ -274,7 +263,7 @@ func IsAddress(address string) bool {
 	return true
 }
 
-func ParseFloat(value string) float64 {
+func parseFloat(value string) float64 {
 	value = strings.TrimSpace(value)
 	if value == "" {
 		return 0
@@ -286,7 +275,7 @@ func ParseFloat(value string) float64 {
 	return parsed
 }
 
-func MergeWalletSignal(wallet Wallet, signal WalletSignal, cfg PriorityConfig) Wallet {
+func mergeWalletSignal(wallet Wallet, signal WalletSignal, cfg PriorityConfig) Wallet {
 	now := signal.SeenAt
 	if now.IsZero() {
 		now = cfg.now()
@@ -318,7 +307,7 @@ func MergeWalletSignal(wallet Wallet, signal WalletSignal, cfg PriorityConfig) W
 		}
 		wallet.LeaderboardPNL = signal.LeaderboardPNL
 		wallet.LeaderboardROI = signal.LeaderboardROI
-		if wallet.LastRefreshedAt.IsZero() && wallet.ConsecutiveFailure == 0 && EffectiveAccountValue(wallet) >= 100_000 {
+		if wallet.LastRefreshedAt.IsZero() && wallet.ConsecutiveFailure == 0 && effectiveAccountValue(wallet) >= 100_000 {
 			wallet.NextRefreshAt = now
 		}
 	case SourceManual:
@@ -327,15 +316,15 @@ func MergeWalletSignal(wallet Wallet, signal WalletSignal, cfg PriorityConfig) W
 		}
 	}
 
-	wallet.Tier = ComputeTier(wallet, cfg)
-	wallet.PriorityScore = ComputePriorityScore(wallet, cfg)
+	wallet.Tier = computeTier(wallet, cfg)
+	wallet.PriorityScore = computePriorityScore(wallet, cfg)
 	if wallet.NextRefreshAt.IsZero() {
 		wallet.NextRefreshAt = now
 	}
 	return wallet
 }
 
-func ApplyRefreshSuccess(wallet Wallet, state WalletState, cfg PriorityConfig) Wallet {
+func applyRefreshSuccess(wallet Wallet, state WalletState, cfg PriorityConfig) Wallet {
 	now := cfg.now()
 	wallet.AccountValue = state.Account.AccountValue
 	wallet.LastRefreshedAt = now
@@ -358,13 +347,13 @@ func ApplyRefreshSuccess(wallet Wallet, state WalletState, cfg PriorityConfig) W
 	wallet.TotalPositionValueUSD = totalValue
 	wallet.MaxPositionValueUSD = maxValue
 	wallet.KnownWhale = maxValue >= cfg.whaleThreshold()
-	wallet.Tier = ComputeTier(wallet, cfg)
-	wallet.PriorityScore = ComputePriorityScore(wallet, cfg)
-	wallet.NextRefreshAt = now.Add(TargetInterval(wallet, cfg))
+	wallet.Tier = computeTier(wallet, cfg)
+	wallet.PriorityScore = computePriorityScore(wallet, cfg)
+	wallet.NextRefreshAt = now.Add(targetInterval(wallet, cfg))
 	return wallet
 }
 
-func ApplyRefreshFailure(wallet Wallet, err error, cfg PriorityConfig) Wallet {
+func applyRefreshFailure(wallet Wallet, err error, cfg PriorityConfig) Wallet {
 	now := cfg.now()
 	wallet.LastRefreshedAt = now
 	wallet.LastFailedRefreshAt = now
@@ -375,11 +364,11 @@ func ApplyRefreshFailure(wallet Wallet, err error, cfg PriorityConfig) Wallet {
 	}
 	backoff := time.Duration(1<<min(wallet.ConsecutiveFailure, 6)) * time.Minute
 	wallet.NextRefreshAt = now.Add(backoff)
-	wallet.PriorityScore = ComputePriorityScore(wallet, cfg)
+	wallet.PriorityScore = computePriorityScore(wallet, cfg)
 	return wallet
 }
 
-func ComputeTier(wallet Wallet, cfg PriorityConfig) int {
+func computeTier(wallet Wallet, cfg PriorityConfig) int {
 	if wallet.KnownWhale || wallet.MaxPositionValueUSD >= cfg.whaleThreshold() {
 		return TierKnownWhale
 	}
@@ -392,7 +381,7 @@ func ComputeTier(wallet Wallet, cfg PriorityConfig) int {
 	return TierCold
 }
 
-func ComputePriorityScore(wallet Wallet, cfg PriorityConfig) float64 {
+func computePriorityScore(wallet Wallet, cfg PriorityConfig) float64 {
 	now := cfg.now()
 	score := staleScore(wallet, now, cfg)
 	score += knownWhaleScore(wallet)
@@ -409,8 +398,8 @@ func ComputePriorityScore(wallet Wallet, cfg PriorityConfig) float64 {
 	return score
 }
 
-func TargetInterval(wallet Wallet, cfg PriorityConfig) time.Duration {
-	switch ComputeTier(wallet, cfg) {
+func targetInterval(wallet Wallet, cfg PriorityConfig) time.Duration {
+	switch computeTier(wallet, cfg) {
 	case TierKnownWhale:
 		if wallet.MaxPositionValueUSD >= 10_000_000 {
 			return 10 * time.Second
@@ -429,7 +418,7 @@ func TargetInterval(wallet Wallet, cfg PriorityConfig) time.Duration {
 }
 
 // MaxRefreshInterval caps how long the coverage lane may postpone a due wallet.
-func MaxRefreshInterval(wallet Wallet, cfg PriorityConfig) time.Duration {
+func maxRefreshInterval(wallet Wallet, cfg PriorityConfig) time.Duration {
 	switch {
 	case wallet.MaxPositionValueUSD >= 10_000_000:
 		return time.Minute
@@ -444,7 +433,7 @@ func MaxRefreshInterval(wallet Wallet, cfg PriorityConfig) time.Duration {
 	}
 }
 
-func IsTrackableState(state WalletState, thresholdUSD float64) bool {
+func isTrackableState(state WalletState, thresholdUSD float64) bool {
 	if thresholdUSD <= 0 {
 		thresholdUSD = 1_000_000
 	}
@@ -565,7 +554,7 @@ func staleScore(wallet Wallet, now time.Time, cfg PriorityConfig) float64 {
 	if wallet.LastRefreshedAt.IsZero() {
 		return 100
 	}
-	interval := TargetInterval(wallet, cfg)
+	interval := targetInterval(wallet, cfg)
 	if interval <= 0 {
 		return 0
 	}
@@ -602,14 +591,14 @@ func leaderboardScore(wallet Wallet, now time.Time) float64 {
 }
 
 func accountValueScore(wallet Wallet) float64 {
-	value := EffectiveAccountValue(wallet)
+	value := effectiveAccountValue(wallet)
 	if value <= 0 {
 		return 0
 	}
 	return math.Min(math.Log10(value)*8, 80)
 }
 
-func EffectiveAccountValue(wallet Wallet) float64 {
+func effectiveAccountValue(wallet Wallet) float64 {
 	if wallet.AccountValue > 0 {
 		return wallet.AccountValue
 	}
@@ -621,14 +610,14 @@ func unscannedValueScore(wallet Wallet) float64 {
 		return 0
 	}
 
-	value := EffectiveAccountValue(wallet)
+	value := effectiveAccountValue(wallet)
 	if value < 100_000 {
 		return 0
 	}
 	return 10_000 + math.Min(value/1_000, 100_000)
 }
 
-func ComputeCandidatePriorityScore(candidate WalletCandidate, cfg PriorityConfig) float64 {
+func computeCandidatePriorityScore(candidate WalletCandidate, cfg PriorityConfig) float64 {
 	score := 10_000 + math.Min(candidate.LeaderboardAccountValue/1_000, 100_000)
 	switch {
 	case candidate.LeaderboardRank > 0 && candidate.LeaderboardRank <= 100:
@@ -642,7 +631,7 @@ func ComputeCandidatePriorityScore(candidate WalletCandidate, cfg PriorityConfig
 	return score
 }
 
-func CandidateWalletSignal(candidate WalletCandidate) WalletSignal {
+func candidateWalletSignal(candidate WalletCandidate) WalletSignal {
 	return WalletSignal{
 		Address:                 candidate.Address,
 		Source:                  SourceLeaderboard,
@@ -665,7 +654,7 @@ func candidateFromSignal(signal WalletSignal, now time.Time, cfg PriorityConfig)
 		LeaderboardPNL:          signal.LeaderboardPNL,
 		LeaderboardROI:          signal.LeaderboardROI,
 	}
-	candidate.PriorityScore = ComputeCandidatePriorityScore(candidate, cfg)
+	candidate.PriorityScore = computeCandidatePriorityScore(candidate, cfg)
 	return candidate
 }
 

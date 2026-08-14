@@ -51,7 +51,7 @@ type AuthService struct {
 	secureCookies bool
 	sessionExpiry time.Duration
 	appURL        string
-	email         *EmailSender
+	email         *emailSender
 }
 
 func NewAuthService(db *sql.DB, secret string, secureCookies bool, sessionExpiry time.Duration, appURL, resendAPIKey, resendFrom string) *AuthService {
@@ -61,7 +61,7 @@ func NewAuthService(db *sql.DB, secret string, secureCookies bool, sessionExpiry
 		secureCookies: secureCookies,
 		sessionExpiry: sessionExpiry,
 		appURL:        strings.TrimRight(appURL, "/"),
-		email:         NewEmailSender(resendAPIKey, resendFrom, !secureCookies),
+		email:         newEmailSender(resendAPIKey, resendFrom, !secureCookies),
 	}
 }
 
@@ -108,7 +108,7 @@ func (s *AuthService) Register(ctx context.Context, email, password, planID stri
 	}
 	verifyURL := s.appURL + "/verify-email/" + rawToken
 	body := fmt.Sprintf("Verify your Hypermetrics email address:\n%s\n\nThis link expires in 24 hours and can only be used once. If you did not create this account, you can ignore this email.", verifyURL)
-	if err := s.email.Send(ctx, user.Email, "Verify your Hypermetrics email", body); err != nil {
+	if err := s.email.send(ctx, user.Email, "Verify your Hypermetrics email", body); err != nil {
 		return user, fmt.Errorf("%w: %v", ErrEmailDelivery, err)
 	}
 	return user, nil
@@ -181,7 +181,7 @@ func (s *AuthService) SendMagicLink(ctx context.Context, email string) error {
     <p style="margin:28px 0 0;color:#6b7280;font-size:13px;line-height:1.5">If you did not request this email, you can safely ignore it.</p>
   </div>
 </body></html>`, html.EscapeString(magicURL))
-	if err := s.email.Send(ctx, email, "Your Hypermetrics sign-in link", body, htmlBody); err != nil {
+	if err := s.email.send(ctx, email, "Your Hypermetrics sign-in link", body, htmlBody); err != nil {
 		return fmt.Errorf("%w: %v", ErrEmailDelivery, err)
 	}
 	return nil

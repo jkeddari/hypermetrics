@@ -15,6 +15,14 @@ import (
 	"github.com/pierrec/lz4/v4"
 )
 
+func ExtractWalletSignals(reader io.Reader) ([]hypercore.WalletSignal, int, error) {
+	return extractWalletSignals(reader)
+}
+
+func (i *Ingester) RunOnce(ctx context.Context, now time.Time) (Stats, error) {
+	return i.runOnce(ctx, now)
+}
+
 const (
 	testAddressA = "0x1111111111111111111111111111111111111111"
 	testAddressB = "0x2222222222222222222222222222222222222222"

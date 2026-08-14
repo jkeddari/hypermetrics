@@ -5,6 +5,18 @@ import (
 	"time"
 )
 
+func NewRateLimiter(limit int, window time.Duration) *rateLimiter {
+	return newRateLimiter(limit, window)
+}
+
+func (rl *rateLimiter) Allow(ip string) bool {
+	return rl.allow(ip)
+}
+
+func (rl *rateLimiter) AllowLimit(key string, limit int) bool {
+	return rl.allowLimit(key, limit)
+}
+
 func TestRateLimiterRejectsRequestsAboveLimit(t *testing.T) {
 	limiter := NewRateLimiter(2, time.Minute)
 	if !limiter.Allow("127.0.0.1") || !limiter.Allow("127.0.0.1") {

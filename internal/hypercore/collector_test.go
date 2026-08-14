@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestCollectLeaderboardStoresOnlyCandidatesAtOrAboveWhaleThreshold(t *testing.T) {
@@ -77,4 +78,74 @@ type roundTripFunc func(*http.Request) (*http.Response, error)
 
 func (fn roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 	return fn(req)
+}
+
+func NewCollector(store *Store, httpClient *http.Client) *collector {
+	return newCollector(store, httpClient)
+}
+
+func (c *collector) CollectLeaderboard(ctx context.Context, url string) (LeaderboardCollectStats, error) {
+	return c.collectLeaderboard(ctx, url)
+}
+
+func (s *Store) ListPositions() ([]WalletPosition, error) {
+	return s.listPositions(context.Background(), `ORDER BY position_value_usd DESC, wallet_address`)
+}
+
+func (s *Store) ListCandidates() ([]WalletCandidate, error) {
+	if s == nil || s.db == nil {
+		return nil, ErrStoreUnavailable
+	}
+	rows, err := s.db.Query(`
+		SELECT address, first_seen_at, last_seen_leaderboard_at, next_scan_at,
+			scan_attempts, consecutive_failures, last_error, leaderboard_rank,
+			leaderboard_account_value, leaderboard_pnl, leaderboard_roi, priority_score
+		FROM wallet_candidates
+		WHERE status = $1
+		ORDER BY priority_score DESC, leaderboard_account_value DESC, address`, candidatePending)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var candidates []WalletCandidate
+	for rows.Next() {
+		var candidate WalletCandidate
+		if err := rows.Scan(
+			&candidate.Address, &candidate.FirstSeenAt, &candidate.LastSeenLeaderboardAt, &candidate.NextScanAt,
+			&candidate.ScanAttempts, &candidate.ConsecutiveFailure, &candidate.LastError, &candidate.LeaderboardRank,
+			&candidate.LeaderboardAccountValue, &candidate.LeaderboardPNL, &candidate.LeaderboardROI, &candidate.PriorityScore,
+		); err != nil {
+			return nil, err
+		}
+		candidates = append(candidates, candidate)
+	}
+	return candidates, rows.Err()
+}
+
+func (s *Store) ListWallets() ([]Wallet, error) {
+	return s.listWallets(context.Background(), "")
+}
+
+func (s *Store) SaveWallet(wallet Wallet) error {
+	return s.saveWallet(wallet)
+}
+
+func (s *Store) UpsertWalletSignal(signal WalletSignal) (Wallet, error) {
+	return s.upsertWalletSignal(signal)
+}
+
+func (s *Store) UpsertLeaderboardCandidate(signal WalletSignal) (WalletCandidate, bool, bool, bool, error) {
+	return s.upsertLeaderboardCandidate(signal)
+}
+
+func (s *Store) ClaimNextJob(workerID string, coverage bool, lease time.Duration) (RefreshJob, bool, error) {
+	return s.claimNextJob(workerID, coverage, lease)
+}
+
+func (s *Store) ClaimOnDemand(address, workerID string, lease time.Duration) (bool, error) {
+	return s.claimOnDemand(address, workerID, lease)
+}
+
+func (s *Store) ReleaseJob(address, workerID string) error {
+	return s.releaseJob(address, workerID)
 }

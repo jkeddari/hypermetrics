@@ -1,7 +1,5 @@
 package api
 
-type WhaleAlertQuery struct{}
-
 type WhaleAlertItem struct {
 	User             string  `json:"user"`
 	Symbol           string  `json:"symbol"`
@@ -12,8 +10,6 @@ type WhaleAlertItem struct {
 	PositionAction   int16   `json:"position_action"`
 	CreateTime       int64   `json:"create_time"`
 }
-
-type WhalePositionQuery struct{}
 
 type WhalePositionItem struct {
 	User             string  `json:"user"`
@@ -28,10 +24,6 @@ type WhalePositionItem struct {
 	UnrealizedPnL    float64 `json:"unrealized_pnl"`
 }
 
-type PositionQuery struct {
-	Symbol string `json:"symbol"`
-}
-
 type PositionItem struct {
 	User             string  `json:"user"`
 	Symbol           string  `json:"symbol"`
@@ -43,10 +35,6 @@ type PositionItem struct {
 	MarginBalance    float64 `json:"margin_balance"`
 	PositionValueUSD float64 `json:"position_value_usd"`
 	UnrealizedPnL    float64 `json:"unrealized_pnl"`
-}
-
-type UserPositionQuery struct {
-	User string `json:"user"`
 }
 
 type MarginSummary struct {
@@ -146,10 +134,6 @@ type WalletItem struct {
 	PriorityScore         float64  `json:"priority_score"`
 }
 
-type WalletPositionDistributionQuery struct{}
-
-type WalletPnLDistributionQuery struct{}
-
 type DistributionBucket struct {
 	GroupName               string  `json:"group_name"`
 	AllAddressCount         int64   `json:"all_address_count"`
@@ -168,14 +152,6 @@ type DistributionBucket struct {
 	LossAddressCount        int64   `json:"loss_address_count"`
 	ProfitAddressPercent    float64 `json:"profit_address_percent"`
 	LossAddressPercent      float64 `json:"loss_address_percent"`
-}
-
-type LongShortAccountRatioHistoryQuery struct {
-	Symbol    string `json:"symbol"`
-	Interval  string `json:"interval"`
-	Limit     int    `json:"limit"`
-	StartTime int64  `json:"start_time"`
-	EndTime   int64  `json:"end_time"`
 }
 
 type LongShortAccountRatioPoint struct {

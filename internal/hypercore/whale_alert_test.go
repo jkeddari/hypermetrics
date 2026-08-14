@@ -89,7 +89,7 @@ func saveAlertState(t *testing.T, store *Store, cfg PriorityConfig, address stri
 	if err == ErrWalletNotFound {
 		wallet = Wallet{Address: address, FirstSeenAt: refreshedAt}
 	}
-	wallet = ApplyRefreshSuccess(wallet, state, cfg)
+	wallet = applyRefreshSuccess(wallet, state, cfg)
 	if err := store.SaveWalletState(wallet, state); err != nil {
 		t.Fatal(err)
 	}

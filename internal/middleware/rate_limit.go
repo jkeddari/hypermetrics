@@ -8,17 +8,15 @@ import (
 	"time"
 )
 
-// RateLimiter tracks request counts per IP address
-type RateLimiter struct {
+type rateLimiter struct {
 	mu       sync.RWMutex
 	requests map[string][]time.Time
 	limit    int           // Max requests allowed
 	window   time.Duration // Time window for rate limiting
 }
 
-// NewRateLimiter creates a new rate limiter
-func NewRateLimiter(limit int, window time.Duration) *RateLimiter {
-	rl := &RateLimiter{
+func newRateLimiter(limit int, window time.Duration) *rateLimiter {
+	rl := &rateLimiter{
 		requests: make(map[string][]time.Time),
 		limit:    limit,
 		window:   window,
@@ -30,12 +28,11 @@ func NewRateLimiter(limit int, window time.Duration) *RateLimiter {
 	return rl
 }
 
-// Allow checks if request from IP should be allowed
-func (rl *RateLimiter) Allow(ip string) bool {
-	return rl.AllowLimit(ip, rl.limit)
+func (rl *rateLimiter) allow(ip string) bool {
+	return rl.allowLimit(ip, rl.limit)
 }
 
-func (rl *RateLimiter) AllowLimit(key string, limit int) bool {
+func (rl *rateLimiter) allowLimit(key string, limit int) bool {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 
@@ -67,7 +64,7 @@ func (rl *RateLimiter) AllowLimit(key string, limit int) bool {
 }
 
 // cleanupLoop periodically removes old entries to prevent memory leak
-func (rl *RateLimiter) cleanupLoop() {
+func (rl *rateLimiter) cleanupLoop() {
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
 
@@ -77,7 +74,7 @@ func (rl *RateLimiter) cleanupLoop() {
 }
 
 // cleanup removes IPs with no recent requests
-func (rl *RateLimiter) cleanup() {
+func (rl *rateLimiter) cleanup() {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 
@@ -104,7 +101,7 @@ func (rl *RateLimiter) cleanup() {
 // RateLimitAuth creates middleware for auth endpoints
 // Limits: 5 requests per 15 minutes per IP
 func RateLimitAuth() func(http.HandlerFunc) http.HandlerFunc {
-	limiter := NewRateLimiter(5, 15*time.Minute)
+	limiter := newRateLimiter(5, 15*time.Minute)
 
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
@@ -112,7 +109,7 @@ func RateLimitAuth() func(http.HandlerFunc) http.HandlerFunc {
 			ip := getClientIP(r)
 
 			// Check rate limit
-			if !limiter.Allow(ip) {
+			if !limiter.allow(ip) {
 				slog.Warn("rate limit exceeded",
 					"ip", ip,
 					"path", r.URL.Path,

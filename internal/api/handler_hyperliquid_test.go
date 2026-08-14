@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -22,7 +23,7 @@ import (
 
 func TestHyperliquidCurrentEndpoints(t *testing.T) {
 	store := newTestHypercoreStore(t)
-	handler := NewHyperliquidAPIHandler(store, nil, 1_000_000)
+	handler := newHyperliquidAPIHandler(store, nil, 1_000_000)
 
 	user := "0x0000000000000000000000000000000000000001"
 	now := time.Now().UTC()
@@ -62,12 +63,7 @@ func TestHyperliquidCurrentEndpoints(t *testing.T) {
 		},
 	}
 
-	wallet := hypercore.ApplyRefreshSuccess(hypercore.Wallet{Address: user}, state, hypercore.PriorityConfig{
-		WhaleThresholdUSD: 1_000_000,
-		Now: func() time.Time {
-			return now
-		},
-	})
+	wallet := walletFromTestState(state)
 	if err := store.SaveWalletState(wallet, state); err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +72,7 @@ func TestHyperliquidCurrentEndpoints(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/api/hyperliquid/user-position?user_address="+user, nil)
 		rec := httptest.NewRecorder()
 
-		handler.UserPosition(rec, req)
+		handler.userPosition(rec, req)
 
 		if rec.Code != http.StatusOK {
 			t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
@@ -94,7 +90,7 @@ func TestHyperliquidCurrentEndpoints(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/api/hyperliquid/wallet/overview?user_address="+user, nil)
 		rec := httptest.NewRecorder()
 
-		handler.WalletOverview(rec, req)
+		handler.walletOverview(rec, req)
 
 		if rec.Code != http.StatusOK {
 			t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
@@ -115,7 +111,7 @@ func TestHyperliquidCurrentEndpoints(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/api/hyperliquid/position?symbol=BTC&current_page=1", nil)
 		rec := httptest.NewRecorder()
 
-		handler.Position(rec, req)
+		handler.position(rec, req)
 
 		if rec.Code != http.StatusOK {
 			t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
@@ -133,7 +129,7 @@ func TestHyperliquidCurrentEndpoints(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/api/hyperliquid/whale-position", nil)
 		rec := httptest.NewRecorder()
 
-		handler.WhalePosition(rec, req)
+		handler.whalePosition(rec, req)
 
 		if rec.Code != http.StatusOK {
 			t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
@@ -151,7 +147,7 @@ func TestHyperliquidCurrentEndpoints(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/api/hyperliquid/wallets?current_page=1&page_size=10", nil)
 		rec := httptest.NewRecorder()
 
-		handler.Wallets(rec, req)
+		handler.wallets(rec, req)
 
 		if rec.Code != http.StatusOK {
 			t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
@@ -169,7 +165,7 @@ func TestHyperliquidCurrentEndpoints(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/api/hyperliquid/wallet/position-distribution", nil)
 		rec := httptest.NewRecorder()
 
-		handler.WalletPositionDistribution(rec, req)
+		handler.walletPositionDistribution(rec, req)
 
 		if rec.Code != http.StatusOK {
 			t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
@@ -202,7 +198,7 @@ func TestHyperliquidCurrentEndpoints(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/api/hyperliquid/wallet/pnl-distribution", nil)
 		rec := httptest.NewRecorder()
 
-		handler.WalletPnLDistribution(rec, req)
+		handler.walletPnLDistribution(rec, req)
 
 		if rec.Code != http.StatusOK {
 			t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
@@ -228,17 +224,21 @@ func TestHyperliquidCurrentEndpoints(t *testing.T) {
 		closedState := hypercore.WalletState{Account: hypercore.WalletAccount{
 			Address: user, AccountValue: 500_000, RefreshedAt: alertAt, RawReceivedAt: alertAt,
 		}}
-		storedWallet = hypercore.ApplyRefreshSuccess(storedWallet, closedState, hypercore.PriorityConfig{
-			WhaleThresholdUSD: 1_000_000,
-			Now:               func() time.Time { return alertAt },
-		})
+		storedWallet.AccountValue = closedState.Account.AccountValue
+		storedWallet.LastRefreshedAt = alertAt
+		storedWallet.LastSuccessfulRefresh = alertAt
+		storedWallet.RefreshAttempts++
+		storedWallet.HasOpenPosition = false
+		storedWallet.MaxPositionValueUSD = 0
+		storedWallet.TotalPositionValueUSD = 0
+		storedWallet.NextRefreshAt = alertAt
 		if err := store.SaveWalletState(storedWallet, closedState); err != nil {
 			t.Fatal(err)
 		}
 
 		req := httptest.NewRequest(http.MethodGet, "/api/hyperliquid/whale-alert", nil)
 		rec := httptest.NewRecorder()
-		handler.WhaleAlert(rec, req)
+		handler.whaleAlert(rec, req)
 
 		if rec.Code != http.StatusOK {
 			t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
@@ -280,7 +280,7 @@ func TestUserPositionRefreshesAndStoresMissingWallet(t *testing.T) {
 		},
 	}
 
-	handler := NewHyperliquidAPIHandler(store, fakeWalletRefreshRequester{
+	handler := newHyperliquidAPIHandler(store, fakeWalletRefreshRequester{
 		store: store,
 		state: state,
 	}, 1_000_000)
@@ -288,7 +288,7 @@ func TestUserPositionRefreshesAndStoresMissingWallet(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/hyperliquid/user-position?user_address="+user, nil)
 	rec := httptest.NewRecorder()
 
-	handler.UserPosition(rec, req)
+	handler.userPosition(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
@@ -399,11 +399,35 @@ func (f fakeWalletRefreshRequester) RequestWalletRefresh(context.Context, string
 		return f.err
 	}
 
-	wallet := hypercore.ApplyRefreshSuccess(hypercore.Wallet{Address: f.state.Account.Address}, f.state, hypercore.PriorityConfig{
-		WhaleThresholdUSD: 1_000_000,
-	})
+	wallet := walletFromTestState(f.state)
 	if err := f.store.SaveWalletState(wallet, f.state); err != nil {
 		return err
 	}
 	return nil
+}
+
+func walletFromTestState(state hypercore.WalletState) hypercore.Wallet {
+	firstSeen := state.Account.RefreshedAt
+	if firstSeen.IsZero() {
+		firstSeen = time.Now().UTC()
+	}
+	wallet := hypercore.Wallet{
+		Address:               state.Account.Address,
+		FirstSeenAt:           firstSeen,
+		LastRefreshedAt:       firstSeen,
+		LastSuccessfulRefresh: firstSeen,
+		RefreshAttempts:       1,
+		AccountValue:          state.Account.AccountValue,
+		NextRefreshAt:         firstSeen,
+	}
+	for _, position := range state.Positions {
+		value := math.Abs(position.PositionValueUSD)
+		wallet.TotalPositionValueUSD += value
+		if value > wallet.MaxPositionValueUSD {
+			wallet.MaxPositionValueUSD = value
+		}
+	}
+	wallet.HasOpenPosition = len(state.Positions) > 0
+	wallet.KnownWhale = wallet.MaxPositionValueUSD >= 1_000_000
+	return wallet
 }

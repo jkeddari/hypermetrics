@@ -8,6 +8,14 @@ import (
 	"testing"
 )
 
+func NewEmailSender(apiKey, from string, devMode bool) *emailSender {
+	return newEmailSender(apiKey, from, devMode)
+}
+
+func (s *emailSender) Send(ctx context.Context, to, subject, textBody string, htmlBody ...string) error {
+	return s.send(ctx, to, subject, textBody, htmlBody...)
+}
+
 func TestEmailSenderUsesResendAPI(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if got := r.Header.Get("Authorization"); got != "Bearer re_test" {

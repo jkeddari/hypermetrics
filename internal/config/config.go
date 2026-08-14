@@ -11,7 +11,6 @@ import (
 )
 
 type Config struct {
-	AppName    string
 	AppEnv     string
 	AppURL     string
 	APIBaseURL string
@@ -53,7 +52,6 @@ func Load(envFile string) *Config {
 	apiKeys := envCSV("HM_API_KEYS", nil)
 
 	return &Config{
-		AppName:     envString("APP_NAME", "Hypermetrics"),
 		AppEnv:      envString("APP_ENV", "development"),
 		AppURL:      envString("APP_URL", "http://localhost:3000"),
 		APIBaseURL:  envString("API_BASE_URL", "http://localhost:8080"),
@@ -114,21 +112,6 @@ func envCSV(key string, def []string) []string {
 		return def
 	}
 	return out
-}
-
-func envBool(key string, def bool) bool {
-	value := os.Getenv(key)
-	if value == "" {
-		return def
-	}
-	switch value {
-	case "1", "true", "TRUE", "yes", "YES", "on", "ON":
-		return true
-	case "0", "false", "FALSE", "no", "NO", "off", "OFF":
-		return false
-	default:
-		return def
-	}
 }
 
 func envFloat(key string, def float64) float64 {

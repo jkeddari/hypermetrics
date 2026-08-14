@@ -17,28 +17,28 @@ import (
 const defaultPositionPageSize = 100
 const defaultWalletPageSize = 100
 
-type HyperliquidAPIHandler struct {
+type hyperliquidAPIHandler struct {
 	store             *hypercore.Store
-	refreshRequester  WalletRefreshRequester
+	refreshRequester  walletRefreshRequester
 	whaleThresholdUSD float64
 }
 
-type WalletRefreshRequester interface {
+type walletRefreshRequester interface {
 	RequestWalletRefresh(ctx context.Context, address string) error
 }
 
-func NewHyperliquidAPIHandler(store *hypercore.Store, refreshRequester WalletRefreshRequester, whaleThresholdUSD float64) *HyperliquidAPIHandler {
+func newHyperliquidAPIHandler(store *hypercore.Store, refreshRequester walletRefreshRequester, whaleThresholdUSD float64) *hyperliquidAPIHandler {
 	if whaleThresholdUSD <= 0 {
 		whaleThresholdUSD = 1_000_000
 	}
-	return &HyperliquidAPIHandler{
+	return &hyperliquidAPIHandler{
 		store:             store,
 		refreshRequester:  refreshRequester,
 		whaleThresholdUSD: whaleThresholdUSD,
 	}
 }
 
-func (h *HyperliquidAPIHandler) WhaleAlert(w http.ResponseWriter, r *http.Request) {
+func (h *hyperliquidAPIHandler) whaleAlert(w http.ResponseWriter, r *http.Request) {
 	alerts, err := h.store.ListWhaleAlerts(200)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, apimodel.ResponseEnvelope[any]{
@@ -55,7 +55,7 @@ func (h *HyperliquidAPIHandler) WhaleAlert(w http.ResponseWriter, r *http.Reques
 	})
 }
 
-func (h *HyperliquidAPIHandler) WhalePosition(w http.ResponseWriter, r *http.Request) {
+func (h *hyperliquidAPIHandler) whalePosition(w http.ResponseWriter, r *http.Request) {
 	if h.store == nil {
 		writeJSON(w, http.StatusInternalServerError, apimodel.ResponseEnvelope[any]{
 			Code: "1006",
@@ -82,7 +82,7 @@ func (h *HyperliquidAPIHandler) WhalePosition(w http.ResponseWriter, r *http.Req
 	})
 }
 
-func (h *HyperliquidAPIHandler) Position(w http.ResponseWriter, r *http.Request) {
+func (h *hyperliquidAPIHandler) position(w http.ResponseWriter, r *http.Request) {
 	if h.store == nil {
 		writeJSON(w, http.StatusInternalServerError, apimodel.ResponseEnvelope[any]{
 			Code: "1006",
@@ -134,7 +134,7 @@ func (h *HyperliquidAPIHandler) Position(w http.ResponseWriter, r *http.Request)
 	})
 }
 
-func (h *HyperliquidAPIHandler) UserPosition(w http.ResponseWriter, r *http.Request) {
+func (h *hyperliquidAPIHandler) userPosition(w http.ResponseWriter, r *http.Request) {
 	if h.store == nil {
 		writeJSON(w, http.StatusInternalServerError, apimodel.ResponseEnvelope[any]{
 			Code: "1006",
@@ -188,7 +188,7 @@ func (h *HyperliquidAPIHandler) UserPosition(w http.ResponseWriter, r *http.Requ
 	})
 }
 
-func (h *HyperliquidAPIHandler) WalletOverview(w http.ResponseWriter, r *http.Request) {
+func (h *hyperliquidAPIHandler) walletOverview(w http.ResponseWriter, r *http.Request) {
 	if h.store == nil {
 		writeJSON(w, http.StatusInternalServerError, apimodel.ResponseEnvelope[any]{
 			Code: "1006",
@@ -241,7 +241,7 @@ func (h *HyperliquidAPIHandler) WalletOverview(w http.ResponseWriter, r *http.Re
 	})
 }
 
-func (h *HyperliquidAPIHandler) loadWalletState(ctx context.Context, user string) (hypercore.WalletState, error, error) {
+func (h *hyperliquidAPIHandler) loadWalletState(ctx context.Context, user string) (hypercore.WalletState, error, error) {
 	state, err := h.store.GetWalletState(user)
 	if !errors.Is(err, hypercore.ErrWalletNotFound) && (err != nil || walletStateFresh(state, time.Now().UTC())) {
 		return state, nil, err
@@ -263,7 +263,7 @@ func walletStateFresh(state hypercore.WalletState, now time.Time) bool {
 	return !refreshedAt.IsZero() && now.Sub(refreshedAt) < hypercore.OnDemandFreshness
 }
 
-func (h *HyperliquidAPIHandler) refreshUserPosition(ctx context.Context, user string) error {
+func (h *hyperliquidAPIHandler) refreshUserPosition(ctx context.Context, user string) error {
 	if h.refreshRequester == nil {
 		return corebus.ErrCoreUnavailable
 	}
@@ -392,7 +392,7 @@ func writeRefreshError(w http.ResponseWriter, err error) {
 	writeJSON(w, status, apimodel.ResponseEnvelope[any]{Code: "1005", Msg: message, Data: nil})
 }
 
-func (h *HyperliquidAPIHandler) Wallets(w http.ResponseWriter, r *http.Request) {
+func (h *hyperliquidAPIHandler) wallets(w http.ResponseWriter, r *http.Request) {
 	if h.store == nil {
 		writeJSON(w, http.StatusInternalServerError, apimodel.ResponseEnvelope[any]{
 			Code: "1006",
@@ -428,7 +428,7 @@ func (h *HyperliquidAPIHandler) Wallets(w http.ResponseWriter, r *http.Request) 
 	})
 }
 
-func (h *HyperliquidAPIHandler) WalletPositionDistribution(w http.ResponseWriter, r *http.Request) {
+func (h *hyperliquidAPIHandler) walletPositionDistribution(w http.ResponseWriter, r *http.Request) {
 	buckets, err := h.store.ListWalletPositionDistribution()
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, apimodel.ResponseEnvelope[any]{
@@ -447,7 +447,7 @@ func (h *HyperliquidAPIHandler) WalletPositionDistribution(w http.ResponseWriter
 	})
 }
 
-func (h *HyperliquidAPIHandler) WalletPnLDistribution(w http.ResponseWriter, r *http.Request) {
+func (h *hyperliquidAPIHandler) walletPnLDistribution(w http.ResponseWriter, r *http.Request) {
 	buckets, err := h.store.ListWalletPnLDistribution()
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, apimodel.ResponseEnvelope[any]{
@@ -466,7 +466,7 @@ func (h *HyperliquidAPIHandler) WalletPnLDistribution(w http.ResponseWriter, r *
 	})
 }
 
-func (h *HyperliquidAPIHandler) LongShortAccountRatioHistory(w http.ResponseWriter, r *http.Request) {
+func (h *hyperliquidAPIHandler) longShortAccountRatioHistory(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	if query.Get("symbol") == "" {
 		writeJSON(w, http.StatusBadRequest, apimodel.ResponseEnvelope[any]{

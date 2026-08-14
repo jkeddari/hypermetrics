@@ -83,7 +83,7 @@ func (i *Ingester) Run(ctx context.Context) error {
 }
 
 func (i *Ingester) runAndLog(ctx context.Context) error {
-	stats, err := i.RunOnce(ctx, time.Now().UTC())
+	stats, err := i.runOnce(ctx, time.Now().UTC())
 	slog.Info("S3 ingestion pass completed",
 		"objects_found", stats.ObjectsFound,
 		"objects_processed", stats.ObjectsProcessed,
@@ -95,7 +95,7 @@ func (i *Ingester) runAndLog(ctx context.Context) error {
 	return err
 }
 
-func (i *Ingester) RunOnce(ctx context.Context, now time.Time) (Stats, error) {
+func (i *Ingester) runOnce(ctx context.Context, now time.Time) (Stats, error) {
 	if i == nil || i.client == nil || i.store == nil {
 		return Stats{}, errors.New("S3 ingester is not initialized")
 	}
@@ -164,7 +164,7 @@ func (i *Ingester) processObject(ctx context.Context, key, etag string, stats *S
 	}
 	defer object.Body.Close()
 
-	signals, fills, err := ExtractWalletSignals(lz4.NewReader(object.Body))
+	signals, fills, err := extractWalletSignals(lz4.NewReader(object.Body))
 	if err != nil {
 		return false, err
 	}
@@ -188,7 +188,7 @@ type fillMeta struct {
 	Time int64 `json:"time"`
 }
 
-func ExtractWalletSignals(reader io.Reader) ([]hypercore.WalletSignal, int, error) {
+func extractWalletSignals(reader io.Reader) ([]hypercore.WalletSignal, int, error) {
 	decoder := json.NewDecoder(reader)
 	latest := make(map[string]time.Time)
 	fills := 0
