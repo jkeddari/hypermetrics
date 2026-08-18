@@ -34,6 +34,7 @@ func SetupRoutes(webApp *app.WebApp) http.Handler {
 
 	staticFiles, _ := fs.Sub(assets.AssetsFS, ".")
 	mux.Handle("GET /assets/", http.StripPrefix("/assets/", http.FileServer(http.FS(staticFiles))))
+	mux.Handle("GET /favicon.ico", http.RedirectHandler("/assets/images/favicon.svg", http.StatusPermanentRedirect))
 
 	mux.HandleFunc("GET /{$}", s.home)
 	mux.HandleFunc("GET /docs", s.docs)
