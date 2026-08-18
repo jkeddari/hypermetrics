@@ -219,6 +219,28 @@ func TestHyperliquidCurrentEndpoints(t *testing.T) {
 		}
 	})
 
+	t.Run("long short account ratio history", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/api/hyperliquid/global-long-short-account-ratio/history?symbol=BTC&interval=1h", nil)
+		rec := httptest.NewRecorder()
+
+		handler.longShortAccountRatioHistory(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
+		}
+		var response apimodel.ResponseEnvelope[[]apimodel.LongShortAccountRatioPoint]
+		if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+			t.Fatal(err)
+		}
+		if response.Code != "0" || len(response.Data) != 1 {
+			t.Fatalf("unexpected response: %+v", response)
+		}
+		point := response.Data[0]
+		if point.Symbol != "BTC" || point.LongAccount != 1 || point.ShortAccount != 0 || point.LongShortRatio != 0 {
+			t.Fatalf("unexpected ratio point: %+v", point)
+		}
+	})
+
 	t.Run("whale alerts", func(t *testing.T) {
 		alertAt := now.Add(time.Minute)
 		storedWallet, err := store.GetWallet(user)
@@ -258,6 +280,32 @@ func TestHyperliquidCurrentEndpoints(t *testing.T) {
 			t.Fatalf("unexpected CoinGlass alert fields: %+v", response.Data[0])
 		}
 	})
+}
+
+func TestLongShortAccountRatioHistoryValidatesQuery(t *testing.T) {
+	handler := &hyperliquidAPIHandler{}
+	for _, test := range []struct {
+		name string
+		path string
+	}{
+		{name: "missing symbol", path: "?interval=1h"},
+		{name: "missing interval", path: "?symbol=BTC"},
+		{name: "unsupported interval", path: "?symbol=BTC&interval=15m"},
+		{name: "limit too high", path: "?symbol=BTC&interval=1h&limit=1001"},
+		{name: "invalid start time", path: "?symbol=BTC&interval=1h&start_time=now"},
+		{name: "reversed time range", path: "?symbol=BTC&interval=1h&start_time=2000&end_time=1000"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/api/hyperliquid/global-long-short-account-ratio/history"+test.path, nil)
+			rec := httptest.NewRecorder()
+
+			handler.longShortAccountRatioHistory(rec, req)
+
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("expected status 400, got %d: %s", rec.Code, rec.Body.String())
+			}
+		})
+	}
 }
 
 func TestUserPositionRefreshesAndStoresMissingWallet(t *testing.T) {

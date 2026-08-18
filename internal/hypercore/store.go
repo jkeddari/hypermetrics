@@ -24,6 +24,15 @@ const (
 	candidateRejected
 )
 
+var longShortRatioIntervals = []struct {
+	name     string
+	duration time.Duration
+}{
+	{name: "5m", duration: 5 * time.Minute},
+	{name: "1h", duration: time.Hour},
+	{name: "1d", duration: 24 * time.Hour},
+}
+
 type Store struct {
 	db  *sql.DB
 	cfg PriorityConfig
@@ -949,6 +958,10 @@ func (s *Store) RefreshDistributionSnapshot(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	ratioSnapshots, err := s.listLongShortRatioSnapshots(ctx, tx)
+	if err != nil {
+		return err
+	}
 	positionJSON, err := json.Marshal(position)
 	if err != nil {
 		return err
@@ -958,6 +971,7 @@ func (s *Store) RefreshDistributionSnapshot(ctx context.Context) error {
 		return err
 	}
 
+	computedAt := time.Now().UTC()
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO distribution_snapshots (id, computed_at, position_distribution, pnl_distribution)
 		VALUES (1, $1, $2::jsonb, $3::jsonb)
@@ -965,12 +979,124 @@ func (s *Store) RefreshDistributionSnapshot(ctx context.Context) error {
 			computed_at = EXCLUDED.computed_at,
 			position_distribution = EXCLUDED.position_distribution,
 			pnl_distribution = EXCLUDED.pnl_distribution`,
-		time.Now().UTC(), string(positionJSON), string(pnlJSON),
+		computedAt, string(positionJSON), string(pnlJSON),
 	)
 	if err != nil {
 		return err
 	}
+	for _, interval := range longShortRatioIntervals {
+		snapshotAt := computedAt.Truncate(interval.duration)
+		for _, snapshot := range ratioSnapshots {
+			if _, err := tx.ExecContext(ctx, `
+				INSERT INTO long_short_ratio_snapshots (
+					symbol, interval, snapshot_at, positioned_wallet_count, long_wallet_count, short_wallet_count
+				) VALUES ($1, $2, $3, $4, $5, $6)
+				ON CONFLICT (symbol, interval, snapshot_at) DO UPDATE SET
+					positioned_wallet_count = EXCLUDED.positioned_wallet_count,
+					long_wallet_count = EXCLUDED.long_wallet_count,
+					short_wallet_count = EXCLUDED.short_wallet_count`,
+				snapshot.Symbol, interval.name, snapshotAt,
+				snapshot.PositionedWalletCount, snapshot.LongWalletCount, snapshot.ShortWalletCount,
+			); err != nil {
+				return err
+			}
+		}
+	}
 	return tx.Commit()
+}
+
+func (s *Store) listLongShortRatioSnapshots(ctx context.Context, queryer sqlQueryer) ([]LongShortRatioSnapshot, error) {
+	if s == nil || s.db == nil {
+		return nil, ErrStoreUnavailable
+	}
+	rows, err := queryer.QueryContext(ctx, `
+		SELECT symbol,
+			COUNT(DISTINCT wallet_address),
+			COUNT(DISTINCT wallet_address) FILTER (WHERE position_size > 0),
+			COUNT(DISTINCT wallet_address) FILTER (WHERE position_size < 0)
+		FROM wallet_positions_current
+		WHERE position_size <> 0
+		GROUP BY symbol
+		ORDER BY symbol`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	snapshots := make([]LongShortRatioSnapshot, 0)
+	for rows.Next() {
+		var snapshot LongShortRatioSnapshot
+		if err := rows.Scan(
+			&snapshot.Symbol,
+			&snapshot.PositionedWalletCount,
+			&snapshot.LongWalletCount,
+			&snapshot.ShortWalletCount,
+		); err != nil {
+			return nil, err
+		}
+		snapshots = append(snapshots, snapshot)
+	}
+	return snapshots, rows.Err()
+}
+
+func IsLongShortInterval(interval string) bool {
+	for _, supported := range longShortRatioIntervals {
+		if interval == supported.name {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *Store) ListLongShortAccountRatioHistory(
+	ctx context.Context,
+	symbol, interval string,
+	limit int,
+	startTime, endTime *time.Time,
+) ([]LongShortRatioSnapshot, error) {
+	if s == nil || s.db == nil {
+		return nil, ErrStoreUnavailable
+	}
+	if limit <= 0 || limit > 1000 {
+		limit = 1000
+	}
+
+	symbol = strings.ToUpper(strings.TrimSpace(symbol))
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT snapshot_at, symbol, positioned_wallet_count, long_wallet_count, short_wallet_count
+		FROM long_short_ratio_snapshots
+		WHERE symbol = $1
+		  AND interval = $2
+		  AND ($3::timestamptz IS NULL OR snapshot_at >= $3)
+		  AND ($4::timestamptz IS NULL OR snapshot_at <= $4)
+		ORDER BY snapshot_at DESC
+		LIMIT $5`, symbol, interval, startTime, endTime, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	snapshots := make([]LongShortRatioSnapshot, 0)
+	for rows.Next() {
+		var snapshot LongShortRatioSnapshot
+		if err := rows.Scan(
+			&snapshot.Time,
+			&snapshot.Symbol,
+			&snapshot.PositionedWalletCount,
+			&snapshot.LongWalletCount,
+			&snapshot.ShortWalletCount,
+		); err != nil {
+			return nil, err
+		}
+		snapshots = append(snapshots, snapshot)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	for left, right := 0, len(snapshots)-1; left < right; left, right = left+1, right-1 {
+		snapshots[left], snapshots[right] = snapshots[right], snapshots[left]
+	}
+	return snapshots, nil
 }
 
 func (s *Store) GetDistributionSnapshot(ctx context.Context) (

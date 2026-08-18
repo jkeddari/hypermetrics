@@ -603,7 +603,7 @@ Hypermetrics therefore needs a local data pipeline:
    - Powers `position`, `user-position`, and `whale-position`
 
 5. Snapshot aggregation
-   - Core periodically stores the latest `distribution_snapshots` aggregate
+   - Core periodically stores the latest `distribution_snapshots` and long/short ratio history
    - Powers `position-distribution`, `pnl-distribution`, and `global-long-short-account-ratio/history`
 
 6. Whale alert generation

@@ -218,6 +218,14 @@ type PositionDistributionBucket struct {
 	LossAddressPercent      float64
 }
 
+type LongShortRatioSnapshot struct {
+	Time                  time.Time
+	Symbol                string
+	PositionedWalletCount int64
+	LongWalletCount       int64
+	ShortWalletCount      int64
+}
+
 type PriorityConfig struct {
 	WhaleThresholdUSD    float64
 	RejectedCandidateTTL time.Duration

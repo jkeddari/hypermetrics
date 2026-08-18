@@ -157,6 +157,37 @@ func TestDistributionSnapshotRoundTrip(t *testing.T) {
 	}
 }
 
+func TestLongShortAccountRatioHistory(t *testing.T) {
+	now := time.Date(2026, 7, 30, 12, 0, 0, 0, time.UTC)
+	cfg := PriorityConfig{Now: func() time.Time { return now }}
+	store := openTestStore(t, cfg)
+
+	saveDistributionWallet(t, store, cfg, "0x0000000000000000000000000000000000000401", 500_000, []WalletPosition{
+		{Symbol: "BTC", PositionSize: 1, PositionValueUSD: 100_000},
+	})
+	saveDistributionWallet(t, store, cfg, "0x0000000000000000000000000000000000000402", 500_000, []WalletPosition{
+		{Symbol: "BTC", PositionSize: -1, PositionValueUSD: 100_000},
+	})
+	saveDistributionWallet(t, store, cfg, "0x0000000000000000000000000000000000000403", 500_000, []WalletPosition{
+		{Symbol: "BTC", PositionSize: 0, PositionValueUSD: 0},
+	})
+
+	if err := store.RefreshDistributionSnapshot(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	snapshots, err := store.ListLongShortAccountRatioHistory(context.Background(), "btc", "1h", 1000, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(snapshots) != 1 {
+		t.Fatalf("expected one BTC snapshot, got %d", len(snapshots))
+	}
+	snapshot := snapshots[0]
+	if snapshot.Symbol != "BTC" || snapshot.PositionedWalletCount != 2 || snapshot.LongWalletCount != 1 || snapshot.ShortWalletCount != 1 {
+		t.Fatalf("unexpected ratio snapshot: %+v", snapshot)
+	}
+}
+
 func saveDistributionWallet(
 	t *testing.T,
 	store *Store,

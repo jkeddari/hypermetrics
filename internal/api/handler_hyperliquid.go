@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -474,7 +475,8 @@ func writeDistributionSnapshotError(w http.ResponseWriter, name string, err erro
 
 func (h *hyperliquidAPIHandler) longShortAccountRatioHistory(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
-	if query.Get("symbol") == "" {
+	symbol := strings.ToUpper(strings.TrimSpace(query.Get("symbol")))
+	if symbol == "" {
 		writeJSON(w, http.StatusBadRequest, apimodel.ResponseEnvelope[any]{
 			Code: "1001",
 			Msg:  "missing required parameter: symbol",
@@ -482,7 +484,8 @@ func (h *hyperliquidAPIHandler) longShortAccountRatioHistory(w http.ResponseWrit
 		})
 		return
 	}
-	if query.Get("interval") == "" {
+	interval := strings.TrimSpace(query.Get("interval"))
+	if interval == "" {
 		writeJSON(w, http.StatusBadRequest, apimodel.ResponseEnvelope[any]{
 			Code: "1001",
 			Msg:  "missing required parameter: interval",
@@ -490,8 +493,19 @@ func (h *hyperliquidAPIHandler) longShortAccountRatioHistory(w http.ResponseWrit
 		})
 		return
 	}
-	if limit := query.Get("limit"); limit != "" {
-		if _, err := strconv.Atoi(limit); err != nil {
+	if !hypercore.IsLongShortInterval(interval) {
+		writeJSON(w, http.StatusBadRequest, apimodel.ResponseEnvelope[any]{
+			Code: "1002",
+			Msg:  "invalid parameter: interval",
+			Data: nil,
+		})
+		return
+	}
+
+	limit := 1000
+	if rawLimit := query.Get("limit"); rawLimit != "" {
+		parsed, err := strconv.Atoi(rawLimit)
+		if err != nil || parsed <= 0 || parsed > 1000 {
 			writeJSON(w, http.StatusBadRequest, apimodel.ResponseEnvelope[any]{
 				Code: "1002",
 				Msg:  "invalid parameter: limit",
@@ -499,13 +513,59 @@ func (h *hyperliquidAPIHandler) longShortAccountRatioHistory(w http.ResponseWrit
 			})
 			return
 		}
+		limit = parsed
 	}
 
-	writeJSON(w, http.StatusNotImplemented, apimodel.ResponseEnvelope[[]apimodel.LongShortAccountRatioPoint]{
-		Code: "1006",
-		Msg:  "hyperliquid long short account ratio history not implemented",
-		Data: nil,
+	startTime, ok := parseUnixMillisQuery(w, r, "start_time")
+	if !ok {
+		return
+	}
+	endTime, ok := parseUnixMillisQuery(w, r, "end_time")
+	if !ok {
+		return
+	}
+	if startTime != nil && endTime != nil && startTime.After(*endTime) {
+		writeJSON(w, http.StatusBadRequest, apimodel.ResponseEnvelope[any]{
+			Code: "1002",
+			Msg:  "invalid parameter: start_time",
+			Data: nil,
+		})
+		return
+	}
+
+	points, err := h.store.ListLongShortAccountRatioHistory(r.Context(), symbol, interval, limit, startTime, endTime)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, apimodel.ResponseEnvelope[any]{
+			Code: "1006",
+			Msg:  "failed to load long short account ratio history",
+			Data: nil,
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, apimodel.ResponseEnvelope[[]apimodel.LongShortAccountRatioPoint]{
+		Code: "0",
+		Msg:  "success",
+		Data: mapLongShortAccountRatioPoints(points),
 	})
+}
+
+func parseUnixMillisQuery(w http.ResponseWriter, r *http.Request, key string) (*time.Time, bool) {
+	raw := r.URL.Query().Get(key)
+	if raw == "" {
+		return nil, true
+	}
+	millis, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || millis < 0 {
+		writeJSON(w, http.StatusBadRequest, apimodel.ResponseEnvelope[any]{
+			Code: "1002",
+			Msg:  "invalid parameter: " + key,
+			Data: nil,
+		})
+		return nil, false
+	}
+	value := time.UnixMilli(millis).UTC()
+	return &value, true
 }
 
 func writeJSON(w http.ResponseWriter, status int, payload any) {
@@ -636,6 +696,39 @@ func mapPositionDistribution(buckets []hypercore.PositionDistributionBucket) []a
 		})
 	}
 	return out
+}
+
+func mapLongShortAccountRatioPoints(points []hypercore.LongShortRatioSnapshot) []apimodel.LongShortAccountRatioPoint {
+	items := make([]apimodel.LongShortAccountRatioPoint, 0, len(points))
+	for _, point := range points {
+		positioned := float64(point.PositionedWalletCount)
+		longAccount := ratio(point.LongWalletCount, positioned)
+		shortAccount := ratio(point.ShortWalletCount, positioned)
+		shortWallets := float64(point.ShortWalletCount)
+		longShortRatio := 0.0
+		if shortWallets > 0 {
+			longShortRatio = roundRatio(float64(point.LongWalletCount) / shortWallets)
+		}
+		items = append(items, apimodel.LongShortAccountRatioPoint{
+			Time:           point.Time.UnixMilli(),
+			Symbol:         point.Symbol,
+			LongAccount:    longAccount,
+			ShortAccount:   shortAccount,
+			LongShortRatio: longShortRatio,
+		})
+	}
+	return items
+}
+
+func ratio(part int64, total float64) float64 {
+	if total == 0 {
+		return 0
+	}
+	return roundRatio(float64(part) / total)
+}
+
+func roundRatio(value float64) float64 {
+	return math.Round(value*100) / 100
 }
 
 func mapWallets(wallets []hypercore.Wallet) []apimodel.WalletItem {

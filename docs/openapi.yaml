@@ -297,6 +297,39 @@ paths:
               --url 'https://api.hypermetrics.xyz/api/hyperliquid/wallet/pnl-distribution' \
               --header 'HM-API-KEY: hm_live_your_key'
 
+  /api/hyperliquid/global-long-short-account-ratio/history:
+    get:
+      operationId: getGlobalLongShortAccountRatioHistory
+      tags: [Positions]
+      summary: Get global long and short account ratio history
+      description: Returns historical account-side ratios for indexed wallets with a non-zero position in the requested symbol.
+      parameters:
+        - $ref: "#/components/parameters/Symbol"
+        - $ref: "#/components/parameters/Interval"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/StartTime"
+        - $ref: "#/components/parameters/EndTime"
+      responses:
+        "200":
+          description: Long/short account ratio history loaded successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LongShortAccountRatioResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      x-codeSamples:
+        - lang: Shell
+          label: cURL
+          source: |
+            curl --request GET \
+              --url 'https://api.hypermetrics.xyz/api/hyperliquid/global-long-short-account-ratio/history?symbol=BTC&interval=1h&limit=500' \
+              --header 'HM-API-KEY: hm_live_your_key'
+
 components:
   securitySchemes:
     ApiKeyAuth:
@@ -325,6 +358,40 @@ components:
         minimum: 1
         default: 1
       example: 1
+    Interval:
+      name: interval
+      in: query
+      required: true
+      description: Snapshot interval.
+      schema:
+        type: string
+        enum: [5m, 1h, 1d]
+      example: 1h
+    Limit:
+      name: limit
+      in: query
+      required: false
+      description: Maximum number of history points returned.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 1000
+        default: 1000
+      example: 500
+    StartTime:
+      name: start_time
+      in: query
+      required: false
+      description: Inclusive start timestamp in Unix milliseconds.
+      schema:
+        $ref: "#/components/schemas/UnixTimestampMilliseconds"
+    EndTime:
+      name: end_time
+      in: query
+      required: false
+      description: Inclusive end timestamp in Unix milliseconds.
+      schema:
+        $ref: "#/components/schemas/UnixTimestampMilliseconds"
 
   responses:
     BadRequest:
@@ -498,6 +565,41 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/DistributionBucket"
+    LongShortAccountRatioResponse:
+      type: object
+      required: [code, msg, data]
+      properties:
+        code:
+          $ref: "#/components/schemas/SuccessCode"
+        msg:
+          type: string
+          const: success
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/LongShortAccountRatio"
+
+    LongShortAccountRatio:
+      type: object
+      required: [time, symbol, long_account, short_account, long_short_ratio]
+      properties:
+        time:
+          $ref: "#/components/schemas/UnixTimestampMilliseconds"
+        symbol:
+          type: string
+          example: BTC
+        long_account:
+          type: number
+          format: double
+          description: Long wallet count divided by positioned wallet count.
+        short_account:
+          type: number
+          format: double
+          description: Short wallet count divided by positioned wallet count.
+        long_short_ratio:
+          type: number
+          format: double
+          description: Long wallet count divided by short wallet count; zero when there are no short wallets.
 
     WhaleAlert:
       type: object
