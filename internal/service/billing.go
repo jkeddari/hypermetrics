@@ -17,8 +17,6 @@ import (
 	"github.com/stripe/stripe-go/v85/webhook"
 )
 
-const trialDays int64 = 7
-
 var (
 	ErrBillingNotConfigured    = errors.New("billing is not configured")
 	ErrInvalidPlan             = errors.New("invalid billing plan")
@@ -131,14 +129,6 @@ func (s *BillingService) CreateCheckout(ctx context.Context, user *model.User, p
 
 	subscriptionData := &stripe.CheckoutSessionCreateSubscriptionDataParams{
 		Metadata: map[string]string{"user_id": user.ID, "plan": planID},
-	}
-	if sub == nil || sub.TrialUsedAt == nil {
-		subscriptionData.TrialPeriodDays = stripe.Int64(trialDays)
-		subscriptionData.TrialSettings = &stripe.CheckoutSessionCreateSubscriptionDataTrialSettingsParams{
-			EndBehavior: &stripe.CheckoutSessionCreateSubscriptionDataTrialSettingsEndBehaviorParams{
-				MissingPaymentMethod: stripe.String("cancel"),
-			},
-		}
 	}
 	params := &stripe.CheckoutSessionCreateParams{
 		Mode:                    stripe.String("subscription"),

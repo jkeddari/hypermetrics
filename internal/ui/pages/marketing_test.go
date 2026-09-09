@@ -15,9 +15,9 @@ func TestMarketingForActiveSubscriptions(t *testing.T) {
 	tests := []struct {
 		plan, action string
 	}{
-		{plan: "builder", action: "Upgrade"},
+		{plan: "builder", action: "Coming soon"},
 		{plan: "pro", action: "Downgrade"},
-		{plan: "enterprise", action: "Current plan"},
+		{plan: "enterprise", action: "Downgrade"},
 	}
 	for _, test := range tests {
 		t.Run(test.plan, func(t *testing.T) {
@@ -97,7 +97,7 @@ func TestHomeIncludesStructuredData(t *testing.T) {
 	if err := Marketing("https://hypermetrics.xyz", false, nil).Render(context.Background(), &body); err != nil {
 		t.Fatal(err)
 	}
-	for _, expected := range []string{`application/ld+json`, `"@type":"WebSite"`, `"@type":"Organization"`, `hello@hypermetrics.xyz`, `/assets/images/logo-512.png`} {
+	for _, expected := range []string{`application/ld+json`, `"@type":"WebSite"`, `"@type":"Organization"`, `hello@hypermetrics.xyz`, `/assets/images/logo-512.png`, `Free`, `Coming soon`} {
 		if !strings.Contains(body.String(), expected) {
 			t.Fatalf("structured data is missing %q", expected)
 		}

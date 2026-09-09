@@ -29,7 +29,7 @@ templ Marketing(siteURL string, loggedIn bool, subscription *model.Subscription)
 							}
 						} else {
 							@button.Button(button.Props{Href: "/register?plan=builder", Size: button.SizeLg, Class: "h-11 w-full px-5 sm:w-auto"}) {
-								Start your 7-day trial → 
+								Get started →
 							}
 						}
 						@button.Button(button.Props{Href: "/docs", Variant: button.VariantOutline, Size: button.SizeLg, Class: "h-11 w-full px-5 sm:w-auto"}) {
@@ -39,7 +39,7 @@ templ Marketing(siteURL string, loggedIn bool, subscription *model.Subscription)
 					if subscription.Entitled() {
 						<p class="mt-4 text-sm text-muted-foreground">Manage your API keys and subscription from your dashboard.</p>
 					} else {
-						<p class="mt-4 text-sm text-muted-foreground">Full API access for 7 days. Plans start at $19/month.</p>
+						<p class="mt-4 text-sm text-muted-foreground">Full API access with the Builder plan for free.</p>
 					}
 				</div>
 				<div class="relative mx-auto w-full max-w-xl">
@@ -105,14 +105,14 @@ templ Marketing(siteURL string, loggedIn bool, subscription *model.Subscription)
 				<div class="mx-auto max-w-3xl text-center">
 					<p class="text-sm font-semibold uppercase tracking-widest text-primary">Simple pricing</p>
 					<h2 class="mt-4 text-4xl font-bold tracking-tight sm:text-5xl">Start small. Scale when your traffic does.</h2>
-					<p class="mt-5 text-lg text-muted-foreground">Every plan includes the complete Hypermetrics API and a 7-day free trial. Choose the request capacity your product needs.</p>
+					<p class="mt-5 text-lg text-muted-foreground">Builder includes the complete Hypermetrics API. Pro is coming soon.</p>
 				</div>
 				<div class="mx-auto mt-14 grid max-w-7xl gap-6 md:grid-cols-2 lg:grid-cols-3">
-					@pricingCard("builder", "Builder", "For prototypes, dashboards, and focused trading tools.", "$19", "60", false, false, subscription)
-					@pricingCard("pro", "Pro", "For production bots and products with sustained traffic.", "$49", "600", true, false, subscription)
-					@pricingCard("enterprise", "Enterprise", "For teams with custom throughput and support requirements.", "On request", "Custom", false, true, subscription)
+					@pricingCard("builder", "Builder", "For prototypes, dashboards, and focused trading tools.", "Free", "60", false, subscription)
+					@pricingCard("pro", "Pro", "For production bots and products with sustained traffic.", "Coming soon", "600", false, subscription)
+					@pricingCard("enterprise", "Enterprise", "For teams with custom throughput and support requirements.", "On request", "Custom", true, subscription)
 				</div>
-				<p class="mt-7 text-center text-sm text-muted-foreground">All prices are in USD and exclude tax. Applicable taxes are added at checkout. Billing starts after your 7-day trial.</p>
+				<p class="mt-7 text-center text-sm text-muted-foreground">All prices are in USD and exclude tax.</p>
 			</div>
 		</section>
 		<section id="faq" class="scroll-mt-20 border-y bg-muted/30 py-24">
@@ -131,7 +131,6 @@ templ Marketing(siteURL string, loggedIn bool, subscription *model.Subscription)
 					@faq("What data can I access?", "Hypermetrics covers whale alerts, high-notional positions, wallet margin and position data, tracked wallets, positions by symbol, and long/short and PnL distribution metrics.")
 					@faq("How fresh is the data?", "The refresh system prioritises active and high-value wallets so the most relevant market activity is updated first. Wallet records expose refresh metadata when you need to evaluate freshness.")
 					@faq("Which plan is right for me?", "Builder includes 60 requests per minute for focused tools, while Pro raises that limit to 600 for higher-throughput applications. Enterprise offers custom capacity and priority support for larger teams.")
-					@faq("How does the 7-day trial work?", "Your trial includes the full feature set and request limit of the plan you choose. Paid billing begins after seven days.")
 					@faq("How do I authenticate requests?", "Create an account, generate a revocable key in your dashboard, and send it with each request in the HM-API-KEY header.")
 					@faq("Why is Hypermetrics built in Go?", "Go gives the backend a small runtime footprint and efficient concurrency model, making it a strong fit for a fast, predictable market-data API.")
 				</div>
@@ -145,7 +144,7 @@ templ Marketing(siteURL string, loggedIn bool, subscription *model.Subscription)
 						<p class="mx-auto mt-5 max-w-2xl text-lg opacity-80">Get clean Hyperliquid intelligence into your bot, dashboard, or product today.</p>
 						<div class="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
 							@button.Button(button.Props{Href: "/register?plan=builder", Size: button.SizeLg, Variant: button.VariantSecondary, Class: "h-11 px-5"}) {
-								Start your free trial 
+								Get started
 							}
 							@button.Button(button.Props{Href: "/docs", Size: button.SizeLg, Variant: button.VariantOutline, Class: "h-11 border-primary-foreground/30 bg-transparent px-5 text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground"}) {
 								View API reference 
@@ -186,19 +185,13 @@ templ performancePoint(title string, description string) {
 	</div>
 }
 
-templ pricingCard(planID string, name string, description string, price string, requestsPerMinute string, featured bool, custom bool, subscription *model.Subscription) {
+templ pricingCard(planID string, name string, description string, price string, requestsPerMinute string, custom bool, subscription *model.Subscription) {
 	@card.Card(card.Props{Class: "relative h-full"}) {
 		@card.Header(card.HeaderProps{Class: "p-6 pb-0"}) {
 			if subscription.Entitled() && subscription.PlanID == planID {
 				@card.Action() {
 					@badge.Badge() {
 						Current plan 
-					}
-				}
-			} else if featured {
-				@card.Action() {
-					@badge.Badge() {
-						Most popular 
 					}
 				}
 			}
@@ -212,9 +205,6 @@ templ pricingCard(planID string, name string, description string, price string, 
 		@card.Content(card.ContentProps{Class: "flex flex-1 flex-col p-6 pt-2"}) {
 			<p>
 				<span class="text-5xl font-bold tracking-tight">{ price }</span>
-				if !custom {
-					<span class="text-muted-foreground">/ month</span>
-				}
 			</p>
 			<div class="mt-7 rounded-xl bg-muted p-4">
 				<p class="text-sm text-muted-foreground">API rate limit</p>
@@ -229,7 +219,6 @@ templ pricingCard(planID string, name string, description string, price string, 
 				<li class="flex gap-3"><span class="font-bold text-primary">✓</span> Complete Hypermetrics API access</li>
 				<li class="flex gap-3"><span class="font-bold text-primary">✓</span> Three revocable API keys</li>
 				<li class="flex gap-3"><span class="font-bold text-primary">✓</span> Interactive API documentation</li>
-				<li class="flex gap-3"><span class="font-bold text-primary">✓</span> 7-day free trial</li>
 				if custom {
 					<li class="flex gap-3"><span class="font-bold text-primary">✓</span> Priority support</li>
 				}
@@ -243,6 +232,10 @@ templ pricingCard(planID string, name string, description string, price string, 
 					@button.Button(button.Props{Href: "/register", Class: "h-10 w-full", Variant: button.VariantOutline}) {
 						Request a custom plan 
 					}
+				} else if planID == "pro" {
+					@button.Button(button.Props{Class: "h-10 w-full", Disabled: true}) {
+						Coming soon
+					}
 				} else if subscription.Entitled() {
 					@button.Button(button.Props{Href: "/app/dashboard#billing", Class: "h-10 w-full", Variant: button.VariantOutline}) {
 						if subscription.PlanID == "builder" && planID == "pro" {
@@ -251,13 +244,9 @@ templ pricingCard(planID string, name string, description string, price string, 
 							Downgrade 
 						}
 					}
-				} else if featured {
-					@button.Button(button.Props{Href: "/register?plan=pro", Class: "h-10 w-full"}) {
-						Start 7-day trial 
-					}
 				} else {
 					@button.Button(button.Props{Href: "/register?plan=builder", Class: "h-10 w-full", Variant: button.VariantOutline}) {
-						Start 7-day trial 
+						Get started
 					}
 				}
 			</div>

@@ -158,7 +158,7 @@ templ billingCard(subscription *model.Subscription, csrfToken string) {
 				}
 			} else {
 				@card.Description() {
-					Choose a plan to unlock API keys and start your 7-day trial. 
+					Choose the Builder plan to unlock API keys.
 				}
 			}
 		}
@@ -190,31 +190,22 @@ templ billingCard(subscription *model.Subscription, csrfToken string) {
 					<p class="mb-4 text-sm text-muted-foreground">Current status: <span class="font-medium text-foreground">{ subscription.Status }</span></p>
 				}
 				<div class="grid gap-3 sm:grid-cols-2">
-					@checkoutButton("builder", "Builder — $19/month", csrfToken, false)
-					@checkoutButton("pro", "Pro — $49/month", csrfToken, true)
+					@checkoutButton(csrfToken)
+					@button.Button(button.Props{Class: "w-full", Disabled: true}) {
+						Pro — Coming soon
+					}
 				</div>
-				if subscription.TrialEligible() {
-					<p class="mt-3 text-xs text-muted-foreground">Prices exclude tax. A payment method is collected now and charged after the 7-day trial unless you cancel.</p>
-				} else {
-					<p class="mt-3 text-xs text-muted-foreground">Prices exclude tax. The subscription is charged immediately because the free trial has already been used.</p>
-				}
 			}
 		}
 	}
 }
 
-templ checkoutButton(planID string, text string, csrfToken string, featured bool) {
+templ checkoutButton(csrfToken string) {
 	<form action="/app/billing/checkout" method="POST">
 		<input type="hidden" name="csrf_token" value={ csrfToken }/>
-		<input type="hidden" name="plan" value={ planID }/>
-		if featured {
-			@button.Button(button.Props{Type: button.TypeSubmit, Class: "w-full"}) {
-				{ text }
-			}
-		} else {
-			@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantOutline, Class: "w-full"}) {
-				{ text }
-			}
+		<input type="hidden" name="plan" value="builder"/>
+		@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantOutline, Class: "w-full"}) {
+			Builder — Free
 		}
 	</form>
 }
